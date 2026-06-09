@@ -1,13 +1,4 @@
-import {
-  Actor,
-  Color,
-  Font,
-  FontUnit,
-  Rectangle,
-  Text,
-  TextAlign,
-  Vector,
-} from 'excalibur';
+import { Actor, Color, Font, FontUnit, Rectangle, Text, Vector } from 'excalibur';
 import { COLOR_ACCENT, COLOR_CORE_PULSE } from '../constants';
 
 export interface ButtonOptions {
@@ -37,12 +28,13 @@ export const createButton = (opts: ButtonOptions): Actor => {
   caption.graphics.use(
     new Text({
       text: opts.label,
+      // No textAlign here: the graphics component already centers the Text
+      // graphic on the actor; combining both shifts the caption off-center.
       font: new Font({
         family: 'monospace',
         size: opts.fontSize ?? 26,
         unit: FontUnit.Px,
         color: Color.White,
-        textAlign: TextAlign.Center,
         bold: true,
       }),
     })
