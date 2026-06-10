@@ -26,7 +26,7 @@ export const getLevelConfig = (level: number): LevelConfig => {
       BASE_SPAWN_INTERVAL_MS - (clamped - 1) * SPAWN_INTERVAL_DECREMENT_MS,
       MIN_SPAWN_INTERVAL_MS
     ),
-    maxConcurrent: Math.min(1 + Math.floor(clamped / 8), 6),
+    maxConcurrent: Math.min(1 + Math.floor(clamped / 12), 4),
     ringsToClear: Math.min(1 + Math.ceil(clamped / 10), 8),
   };
 };
