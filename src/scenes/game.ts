@@ -116,6 +116,7 @@ export class GameScene extends Scene {
 
     this.field.setRotationInput(this.touchDir);
     this.field.update(engine, elapsed);
+    this.hud.update(elapsed);
 
     const config = getLevelConfig(this.level);
     if (

@@ -1,5 +1,5 @@
 import { Actor, Color, Font, FontUnit, Label, Scene, TextAlign, vec } from 'excalibur';
-import { COLOR_TEXT_MUTED, GAME_WIDTH } from '../constants';
+import { COLOR_TEXT_MUTED, GAME_WIDTH, SCORE_COUNT_RATE } from '../constants';
 import { crispCanvas } from '../fx/canvas';
 import { withAlpha } from '../fx/palette';
 import type { PieceShape } from '../types';
@@ -10,6 +10,8 @@ export interface Hud {
   setProgress(cleared: number, needed: number): void;
   /** Mini lattice preview of the upcoming piece. */
   setNext(shape: PieceShape): void;
+  /** Advances the score count-up animation. */
+  update(elapsedMs: number): void;
 }
 
 /** Square size of one preview cell in px. */
@@ -58,9 +60,27 @@ export const createHud = (scene: Scene): Hud => {
   scene.add(nextTitle);
   scene.add(preview);
 
+  let shownScore = 0;
+  let targetScore = 0;
+
   return {
     setScore: (value: number): void => {
-      score.text = `SCORE ${value}`;
+      targetScore = value;
+      // Only count upward — a fresh run snaps straight back to its start.
+      if (value < shownScore) {
+        shownScore = value;
+        score.text = `SCORE ${value}`;
+      }
+    },
+    update: (elapsedMs: number): void => {
+      if (shownScore === targetScore) {
+        return;
+      }
+      shownScore += (targetScore - shownScore) * Math.min(1, (elapsedMs / 1000) * SCORE_COUNT_RATE);
+      if (targetScore - shownScore < 1) {
+        shownScore = targetScore;
+      }
+      score.text = `SCORE ${Math.round(shownScore)}`;
     },
     setLevel: (value: number): void => {
       level.text = `LEVEL ${value}`;

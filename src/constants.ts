@@ -87,6 +87,10 @@ export const FULL_RING_MULTIPLIER = 2;
 /** The rim marker telegraphs an incoming piece this long before it spawns. */
 export const SPAWN_TELEGRAPH_MS = 900;
 
+// --- HUD ---
+/** How fast the displayed score chases the real score (1/s). */
+export const SCORE_COUNT_RATE = 10;
+
 // --- Effects / timing ---
 export const TRAIL_INTERVAL_MS = 90;
 export const BIND_TWEEN_MS = 220;
