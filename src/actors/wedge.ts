@@ -7,14 +7,8 @@ import {
   WEDGE_GAP_RADIAL,
 } from '../constants';
 import { shade, withAlpha } from '../fx/palette';
-import type { PieceCell } from '../types';
 
 const PAD = 4;
-
-/** Ring used to shape the wedges of a piece in flight (mid-field curvature). */
-export const PIECE_VIRTUAL_RING = 2;
-/** Distance from a piece's virtual circle center to its r=0 cell centers. */
-export const PIECE_VIRTUAL_MID = CORE_RADIUS + (PIECE_VIRTUAL_RING + 0.5) * RING_HEIGHT;
 
 interface WedgeGeometry {
   readonly innerRadius: number;
@@ -82,29 +76,33 @@ const wedgeGraphic = (ring: number, colorHex: string): Canvas => {
   return canvas;
 };
 
-/** A wedge cell positioned in a polar frame (parent provides the circle center). */
-const wedgeActor = (ring: number, midAngle: number, colorHex: string, z: number): Actor => {
+/**
+ * Shape an actor into the wedge for the given ring of a polar frame whose
+ * center is the actor's parent. Works for any ring index >= 0 — falling
+ * pieces use rings beyond the field to match their current radius exactly.
+ */
+export const applyWedge = (
+  actor: Actor,
+  ring: number,
+  midAngle: number,
+  colorHex: string
+): void => {
   const geo = geometryFor(ring);
-  const wedge = new Actor({
-    pos: Vector.fromAngle(midAngle).scale((geo.xMin + geo.xMax) / 2),
-    rotation: midAngle,
-    z,
-  });
-  wedge.graphics.use(wedgeGraphic(ring, colorHex));
-  return wedge;
+  actor.pos = Vector.fromAngle(midAngle).scale((geo.xMin + geo.xMax) / 2);
+  actor.rotation = midAngle;
+  actor.graphics.use(wedgeGraphic(ring, colorHex));
 };
+
+/** Ring index whose wedge mid-radius is closest to the given distance. */
+export const ringIndexForDistance = (dist: number): number =>
+  Math.max(0, Math.round((dist - CORE_RADIUS) / RING_HEIGHT - 0.5));
 
 /**
  * A bound cell rendered as a ring segment that tiles the circle.
  * Positioned in the core's local frame (parent = bound layer).
  */
-export const createBoundWedge = (ring: number, sector: number, colorHex: string): Actor =>
-  wedgeActor(ring, (sector + 0.5) * SECTOR_ANGLE, colorHex, 10);
-
-/**
- * One cell of a tetromino in flight, shaped exactly like the bound wedges so
- * the piece reads as a rounded tetromino from the moment it spawns.
- * Positioned in the piece's local frame (parent = piece root at the virtual center).
- */
-export const createPieceCellWedge = (cell: PieceCell, colorHex: string): Actor =>
-  wedgeActor(cell.r + PIECE_VIRTUAL_RING, cell.s * SECTOR_ANGLE, colorHex, 12);
+export const createBoundWedge = (ring: number, sector: number, colorHex: string): Actor => {
+  const wedge = new Actor({ z: 10 });
+  applyWedge(wedge, ring, (sector + 0.5) * SECTOR_ANGLE, colorHex);
+  return wedge;
+};

@@ -1,12 +1,13 @@
 import { Actor, Vector, vec } from 'excalibur';
-import { CENTER_X, CENTER_Y } from '../constants';
-import { createPieceCellWedge, PIECE_VIRTUAL_MID } from './wedge';
+import { CENTER_X, CENTER_Y, RING_HEIGHT, SECTOR_ANGLE } from '../constants';
+import { applyWedge, ringIndexForDistance } from './wedge';
 import type { PieceCell, PieceShape } from '../types';
 
 /**
- * A tetromino in flight toward the core. Rendered as a rigid chunk of wedge
- * cells (same look as the bound construction) curving with the circle, so the
- * exact shape is visible from the moment it spawns.
+ * A tetromino in flight toward the core. Every cell is rendered in the true
+ * field polar frame — exactly in the lane it will lock into, at its true
+ * radius, with the wedge sized for that radius. The piece arrives as a ring
+ * chunk that shrinks as it converges, and attaches with zero visual snap.
  */
 export interface FallingPiece {
   cells: PieceCell[];
@@ -21,33 +22,35 @@ export interface FallingPiece {
   /** Distance of the r=0 cells from the field center. */
   anchorDist: number;
   readonly speed: number;
-  /** Sits at the piece's virtual circle center; wedge cells are its children. */
+  /** Container at the field center; wedge cells are its children. */
   readonly root: Actor;
+  /** Time spent resting on the surface — locks when it exceeds the grace window. */
+  lockTimer: number;
   trailTimer: number;
 }
 
-/** (Re)build the wedge children from the current cell layout — used on spawn and spin. */
+/** (Re)build one wedge child per cell — used on spawn and spin. */
 export const rebuildPieceCells = (piece: FallingPiece): void => {
   for (const child of [...piece.root.children]) {
     piece.root.removeChild(child);
   }
-  for (const cell of piece.cells) {
-    piece.root.addChild(createPieceCellWedge(cell, piece.color));
+  for (let i = 0; i < piece.cells.length; i++) {
+    piece.root.addChild(new Actor({ z: 12 }));
   }
+  positionPiece(piece);
 };
 
-/**
- * Place the piece: the root sits PIECE_VIRTUAL_MID behind the r=0 cells along
- * the radial path, so the wedge children (positioned on the virtual circle)
- * appear exactly at anchorDist, curving the same way the field does.
- */
+/** Sync every wedge cell to its lane angle and current radius. */
 export const positionPiece = (piece: FallingPiece): void => {
-  const rootDist = piece.anchorDist - PIECE_VIRTUAL_MID;
-  piece.root.pos = vec(
-    CENTER_X + Math.cos(piece.displayAngle) * rootDist,
-    CENTER_Y + Math.sin(piece.displayAngle) * rootDist
-  );
-  piece.root.rotation = piece.displayAngle;
+  piece.cells.forEach((cell, i) => {
+    const child = piece.root.children[i];
+    if (!(child instanceof Actor)) {
+      return;
+    }
+    const dist = piece.anchorDist + cell.r * RING_HEIGHT;
+    const angle = piece.displayAngle + cell.s * SECTOR_ANGLE;
+    applyWedge(child, ringIndexForDistance(dist), angle, piece.color);
+  });
 };
 
 /** World positions of every cell — used for trails and lock effects. */
@@ -69,10 +72,10 @@ export const createFallingPiece = (
     displayAngle: anchorAngle,
     anchorDist,
     speed,
-    root: new Actor({ z: 12 }),
+    root: new Actor({ pos: vec(CENTER_X, CENTER_Y), z: 12 }),
+    lockTimer: 0,
     trailTimer: 0,
   };
   rebuildPieceCells(piece);
-  positionPiece(piece);
   return piece;
 };
