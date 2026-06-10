@@ -38,6 +38,13 @@ export const PIECE_ALIGN_SPEED = 10;
  */
 export const LOCK_DELAY_MS = 400;
 
+/**
+ * Float tolerance when checking whether a lane step or spin would sweep the
+ * construction through a piece that is already deeper than the destination
+ * lane's surface — such moves are blocked instead of pushing the piece out.
+ */
+export const SWEEP_EPSILON = 0.001;
+
 // --- Inner-ring approach ---
 /**
  * Pieces brake to this fraction of their speed near the core, and get a

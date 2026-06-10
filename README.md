@@ -30,6 +30,9 @@ past the dashed boundary, the run is over.
   pieces — overhangs leave holes underneath, exactly like classic Tetris.
 - Near the core, pieces brake and the grace window grows: deep in the well there
   is no stack to warn you, so there is extra time to step the lane sideways.
+- A lane step (or spin) is blocked when it would sweep the construction through
+  a piece that is already deeper than the destination lane's surface — pieces
+  can never be bounced back outward to stall them forever.
 - A translucent ghost always shows the exact cells the piece will lock into
   (it turns red when locking there would end the run).
 - **Clearing**: any contiguous occupied arc of 6+ cells in one ring disappears —

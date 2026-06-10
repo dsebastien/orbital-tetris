@@ -37,6 +37,7 @@ import {
   SOFT_DROP_LOCK_FACTOR,
   SOFT_DROP_SPEED_FACTOR,
   SPAWN_RADIUS,
+  SWEEP_EPSILON,
   TRAIL_INTERVAL_MS,
 } from './constants';
 import { createBackground } from './actors/background';
@@ -255,6 +256,30 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
     return lockRing;
   };
 
+  /** Anchor distance where the given cells come to rest under a core angle. */
+  const restDistFor = (cells: readonly PieceCell[], anchorAngle: number, coreTarget: number): number => {
+    const baseSector = sectorAtAngle(anchorAngle, coreTarget);
+    return CORE_RADIUS + (lockRingFor(cells, baseSector) + 0.5) * RING_HEIGHT;
+  };
+
+  /**
+   * Step one lane, unless the construction would sweep through a piece that
+   * is already deeper than the destination lane's surface. Pushing such a
+   * piece back out would reset its lock timer — an infinite stall.
+   */
+  const tryStep = (dir: -1 | 1): void => {
+    const nextAngle = targetCoreAngle + dir * SECTOR_ANGLE;
+    const blocked = pieces.some(
+      (piece) =>
+        piece.anchorDist < restDistFor(piece.cells, piece.anchorAngle, nextAngle) - SWEEP_EPSILON
+    );
+    if (blocked) {
+      return;
+    }
+    targetCoreAngle = nextAngle;
+    sfx.step();
+  };
+
   /** Demo pieces aim at the base sector minimizing landing height, leading the rotation. */
   const demoSpawnAngle = (cells: readonly PieceCell[]): number => {
     let bestRing = Number.POSITIVE_INFINITY;
@@ -423,7 +448,16 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
     if (!active || active.hardDropped) {
       return;
     }
-    active.cells = rotateCells(active.cells);
+    // Same sweep rule as lane steps: a spin that would only fit farther out
+    // than the piece already is would push it back outward — reject it.
+    const rotated = rotateCells(active.cells);
+    if (
+      active.anchorDist <
+      restDistFor(rotated, active.anchorAngle, targetCoreAngle) - SWEEP_EPSILON
+    ) {
+      return;
+    }
+    active.cells = rotated;
     rebuildPieceCells(active);
     positionPiece(active);
     sfx.spin();
@@ -520,15 +554,13 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
         lastStepDir = dir;
         stepHoldTimer = 0;
         if (dir !== 0) {
-          targetCoreAngle += dir * SECTOR_ANGLE;
-          sfx.step();
+          tryStep(dir);
         }
       } else if (dir !== 0) {
         stepHoldTimer += elapsedMs;
         if (stepHoldTimer >= CORE_STEP_DAS_DELAY_MS) {
-          targetCoreAngle += dir * SECTOR_ANGLE;
+          tryStep(dir);
           stepHoldTimer -= CORE_STEP_REPEAT_MS;
-          sfx.step();
         }
       }
       coreAngle += shortestAngleDelta(coreAngle, targetCoreAngle) * Math.min(1, dt * CORE_SNAP_SPEED);
