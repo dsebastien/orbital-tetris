@@ -6,6 +6,22 @@ export interface GridCell {
 /** Polar grid indexed as [ring][sector]; null = empty. Ring 0 touches the core. */
 export type Grid = (GridCell | null)[][];
 
+/**
+ * One cell of a tetromino on the polar lattice.
+ * `s` = sector offset (tangential), `r` = ring offset (radial, outward).
+ */
+export interface PieceCell {
+  readonly s: number;
+  readonly r: number;
+}
+
+/** A tetromino shape definition. */
+export interface PieceShape {
+  readonly name: string;
+  readonly cells: readonly PieceCell[];
+  readonly color: string;
+}
+
 /** Difficulty parameters for one level. */
 export interface LevelConfig {
   readonly level: number;
