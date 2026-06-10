@@ -59,6 +59,15 @@ export const positionPiece = (piece: FallingPiece): void => {
   });
 };
 
+/** Uniform opacity across the piece's wedge cells — lock-delay telegraph. */
+export const setPieceOpacity = (piece: FallingPiece, opacity: number): void => {
+  for (const child of piece.root.children) {
+    if (child instanceof Actor) {
+      child.graphics.opacity = opacity;
+    }
+  }
+};
+
 /** World positions of every cell — used for trails and lock effects. */
 export const pieceCellWorldPositions = (piece: FallingPiece): Vector[] =>
   piece.root.children

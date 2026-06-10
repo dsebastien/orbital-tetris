@@ -51,6 +51,7 @@ import {
   pieceCellWorldPositions,
   positionPiece,
   rebuildPieceCells,
+  setPieceOpacity,
   type FallingPiece,
 } from './actors/piece';
 import { applyWedge, createBoundWedge, wedgeMidRadius } from './actors/wedge';
@@ -727,6 +728,12 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
       const lane = laneAngleFor(piece);
       piece.displayAngle += shortestAngleDelta(piece.displayAngle, lane) * Math.min(1, dt * PIECE_ALIGN_SPEED);
       positionPiece(piece);
+
+      // Telegraph the grace window: a resting piece pulses until it locks.
+      setPieceOpacity(
+        piece,
+        piece.lockTimer > 0 ? 0.55 + 0.45 * Math.abs(Math.sin(aliveTimer * 0.015)) : 1
+      );
 
       piece.trailTimer += elapsedMs;
       if (piece.trailTimer > TRAIL_INTERVAL_MS) {
