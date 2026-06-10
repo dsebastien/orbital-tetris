@@ -3,6 +3,8 @@
 Circular Tetris built with [Excalibur.js](https://excaliburjs.com), TypeScript and Vite
 (based on the [template-ts-vite](https://github.com/excaliburjs/template-ts-vite) setup).
 
+![Orbital Tetris main menu](docs/screenshot.png)
+
 The seven classic tetrominoes — rounded into ring-segment cells that fit the circle —
 fly from the edges of the screen toward a living core. They bind to the core on contact,
 stacking outward ring by ring. Rotate the core so pieces land where you want, spin the
