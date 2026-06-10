@@ -28,6 +28,8 @@ past the dashed boundary, the run is over.
 - Pieces travel radially inward, rigid, and rest on first contact. A short grace
   window before they lock lets you step or spin at the last moment to intertwine
   pieces — overhangs leave holes underneath, exactly like classic Tetris.
+- Near the core, pieces brake and the grace window grows: deep in the well there
+  is no stack to warn you, so there is extra time to step the lane sideways.
 - A translucent ghost always shows the exact cells the piece will lock into
   (it turns red when locking there would end the run).
 - **Clearing**: any contiguous occupied arc of 6+ cells in one ring disappears —

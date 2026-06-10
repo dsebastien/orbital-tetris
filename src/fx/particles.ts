@@ -5,11 +5,13 @@ import {
   Font,
   FontUnit,
   Label,
+  Rectangle,
   Scene,
   TextAlign,
   Vector,
   vec,
 } from 'excalibur';
+import { CENTER_X, CENTER_Y, FLASH_DURATION_MS, GAME_HEIGHT, GAME_WIDTH } from '../constants';
 
 interface Particle {
   readonly actor: Actor;
@@ -18,6 +20,8 @@ interface Particle {
   readonly maxLife: number;
   /** Scale growth per second — used by shockwaves. */
   readonly grow?: number;
+  /** Starting opacity the fade-out scales from (default 1). */
+  readonly baseOpacity?: number;
 }
 
 export interface ParticleSystem {
@@ -29,6 +33,8 @@ export interface ParticleSystem {
   popup(pos: Vector, text: string, colorHex: string): void;
   /** Expanding fading ring outline — ring clears and explosions. */
   shockwave(pos: Vector, radius: number, colorHex: string): void;
+  /** Full-screen color flash fading out — full-ring clears. */
+  flash(colorHex: string, opacity: number): void;
   update(elapsedMs: number): void;
   clear(): void;
 }
@@ -36,9 +42,14 @@ export interface ParticleSystem {
 export const createParticleSystem = (scene: Scene): ParticleSystem => {
   let particles: Particle[] = [];
 
-  const track = (actor: Actor, vel: Vector, maxLife: number, grow?: number): void => {
+  const track = (
+    actor: Actor,
+    vel: Vector,
+    maxLife: number,
+    extra?: { grow?: number; baseOpacity?: number }
+  ): void => {
     scene.add(actor);
-    particles.push(grow === undefined ? { actor, vel, life: 0, maxLife } : { actor, vel, life: 0, maxLife, grow });
+    particles.push({ actor, vel, life: 0, maxLife, ...extra });
   };
 
   const burst = (pos: Vector, colorHex: string, count: number): void => {
@@ -51,6 +62,14 @@ export const createParticleSystem = (scene: Scene): ParticleSystem => {
       const speed = 40 + Math.random() * 140;
       track(spark, Vector.fromAngle(angle).scale(speed), 350 + Math.random() * 350);
     }
+  };
+
+  const flash = (colorHex: string, opacity: number): void => {
+    const overlay = new Actor({ pos: vec(CENTER_X, CENTER_Y), z: 55 });
+    overlay.graphics.use(
+      new Rectangle({ width: GAME_WIDTH, height: GAME_HEIGHT, color: Color.fromHex(colorHex) })
+    );
+    track(overlay, vec(0, 0), FLASH_DURATION_MS, { baseOpacity: opacity });
   };
 
   const trail = (pos: Vector, colorHex: string): void => {
@@ -88,7 +107,7 @@ export const createParticleSystem = (scene: Scene): ParticleSystem => {
         lineWidth: 4,
       })
     );
-    track(ring, vec(0, 0), 600, 0.9);
+    track(ring, vec(0, 0), 600, { grow: 0.9 });
   };
 
   const update = (elapsedMs: number): void => {
@@ -100,7 +119,8 @@ export const createParticleSystem = (scene: Scene): ParticleSystem => {
         return false;
       }
       particle.actor.pos = particle.actor.pos.add(particle.vel.scale(dt));
-      particle.actor.graphics.opacity = Math.max(0, 1 - particle.life / particle.maxLife);
+      particle.actor.graphics.opacity =
+        (particle.baseOpacity ?? 1) * Math.max(0, 1 - particle.life / particle.maxLife);
       if (particle.grow !== undefined) {
         const scale = 1 + particle.grow * (particle.life / 1000);
         particle.actor.scale = vec(scale, scale);
@@ -116,5 +136,5 @@ export const createParticleSystem = (scene: Scene): ParticleSystem => {
     particles = [];
   };
 
-  return { burst, trail, popup, shockwave, update, clear };
+  return { burst, trail, popup, shockwave, flash, update, clear };
 };

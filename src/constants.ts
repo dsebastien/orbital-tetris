@@ -38,6 +38,18 @@ export const PIECE_ALIGN_SPEED = 10;
  */
 export const LOCK_DELAY_MS = 400;
 
+// --- Inner-ring approach ---
+/**
+ * Pieces brake to this fraction of their speed near the core, and get a
+ * longer grace window when resting on the innermost ring — deep in the well
+ * there is no stack to warn you, so sideways steps need extra room.
+ */
+export const INNER_RING_SLOW_FACTOR = 0.55;
+/** The brake zone: anchor within this many rings of the core surface. */
+export const INNER_SLOW_ZONE_RINGS = 2;
+/** Grace window replacing LOCK_DELAY_MS for locks on the innermost ring. */
+export const INNER_LOCK_DELAY_MS = 700;
+
 // --- Dropping ---
 /** Fall-speed multiplier on the active piece while soft drop is held. */
 export const SOFT_DROP_SPEED_FACTOR = 5;
@@ -68,6 +80,16 @@ export const FULL_RING_MULTIPLIER = 2;
 export const TRAIL_INTERVAL_MS = 90;
 export const BIND_TWEEN_MS = 220;
 export const BANNER_DURATION_MS = 1500;
+/** Camera shake (magnitude px / duration ms) for hard drops and clears. */
+export const SHAKE_HARD_DROP_MAG = 3;
+export const SHAKE_HARD_DROP_MS = 110;
+export const SHAKE_CLEAR_MAG = 4;
+export const SHAKE_CLEAR_MS = 150;
+export const SHAKE_FULL_RING_MAG = 8;
+export const SHAKE_FULL_RING_MS = 220;
+/** Full-screen flash on full-ring clears. */
+export const FLASH_DURATION_MS = 280;
+export const FLASH_FULL_RING_OPACITY = 0.3;
 /** Cleared wedges flash white then shrink/spin away over this long. */
 export const CLEAR_DYING_MS = 320;
 /** Beat between a clear and the outward cells starting to slide inward. */

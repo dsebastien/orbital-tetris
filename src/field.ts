@@ -14,7 +14,11 @@ import {
   CORE_STEP_DAS_DELAY_MS,
   CORE_STEP_REPEAT_MS,
   DEMO_ROTATION_FACTOR,
+  FLASH_FULL_RING_OPACITY,
   FULL_RING_MULTIPLIER,
+  INNER_LOCK_DELAY_MS,
+  INNER_RING_SLOW_FACTOR,
+  INNER_SLOW_ZONE_RINGS,
   LOCK_DELAY_MS,
   MAX_RINGS,
   PIECE_ALIGN_SPEED,
@@ -23,9 +27,15 @@ import {
   SCORE_PER_CLEARED_CELL,
   SCORE_PER_PIECE,
   SECTOR_ANGLE,
+  SECTOR_COUNT,
+  SHAKE_CLEAR_MAG,
+  SHAKE_CLEAR_MS,
+  SHAKE_FULL_RING_MAG,
+  SHAKE_FULL_RING_MS,
+  SHAKE_HARD_DROP_MAG,
+  SHAKE_HARD_DROP_MS,
   SOFT_DROP_LOCK_FACTOR,
   SOFT_DROP_SPEED_FACTOR,
-  SECTOR_COUNT,
   SPAWN_RADIUS,
   TRAIL_INTERVAL_MS,
 } from './constants';
@@ -40,6 +50,7 @@ import {
 } from './actors/piece';
 import { applyWedge, createBoundWedge, wedgeMidRadius } from './actors/wedge';
 import { createParticleSystem } from './fx/particles';
+import { sfx } from './fx/sound';
 import {
   cellAt,
   clearRuns,
@@ -325,6 +336,16 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
     }
     gained *= runs.length;
 
+    if (!opts.demo) {
+      const fullRing = runs.some((run) => run.fullRing);
+      const magnitude = fullRing ? SHAKE_FULL_RING_MAG : SHAKE_CLEAR_MAG;
+      scene.camera.shake(magnitude, magnitude, fullRing ? SHAKE_FULL_RING_MS : SHAKE_CLEAR_MS);
+      if (fullRing) {
+        fx.flash('#ffffff', FLASH_FULL_RING_OPACITY);
+      }
+      sfx.clear(runs.length, fullRing);
+    }
+
     // Cells outward of a removed cell slide inward — record where each one
     // travels from so the rebuild can animate the collapse.
     const sliders: { sector: number; fromRing: number; toRing: number }[] = [];
@@ -353,6 +374,10 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
       ring: lockRing + cell.r,
       color: piece.color,
     }));
+    const slammed = piece.hardDropped;
+    if (slammed) {
+      scene.camera.shake(SHAKE_HARD_DROP_MAG, SHAKE_HARD_DROP_MAG, SHAKE_HARD_DROP_MS);
+    }
     removePiece(piece);
 
     if (!lockCells(grid, placements)) {
@@ -361,8 +386,16 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
         return;
       }
       over = true;
+      sfx.gameOver();
       opts.onGameOver?.(score);
       return;
+    }
+    if (!opts.demo) {
+      if (slammed) {
+        sfx.hardDrop();
+      } else {
+        sfx.lock();
+      }
     }
 
     for (const placement of placements) {
@@ -393,6 +426,7 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
     active.cells = rotateCells(active.cells);
     rebuildPieceCells(active);
     positionPiece(active);
+    sfx.spin();
   };
 
   const hardDropActivePiece = (): void => {
@@ -487,12 +521,14 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
         stepHoldTimer = 0;
         if (dir !== 0) {
           targetCoreAngle += dir * SECTOR_ANGLE;
+          sfx.step();
         }
       } else if (dir !== 0) {
         stepHoldTimer += elapsedMs;
         if (stepHoldTimer >= CORE_STEP_DAS_DELAY_MS) {
           targetCoreAngle += dir * SECTOR_ANGLE;
           stepHoldTimer -= CORE_STEP_REPEAT_MS;
+          sfx.step();
         }
       }
       coreAngle += shortestAngleDelta(coreAngle, targetCoreAngle) * Math.min(1, dt * CORE_SNAP_SPEED);
@@ -518,11 +554,15 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
       spawnPiece();
     }
 
-    const lockDelay = opts.demo ? 0 : LOCK_DELAY_MS;
     const active = activePiece();
     for (const piece of [...pieces]) {
       const dropped = piece === active && softDrop;
-      piece.anchorDist -= piece.speed * dt * (dropped ? SOFT_DROP_SPEED_FACTOR : 1);
+      // Brake deep in the well (unless soft dropping): near the core there is
+      // no stack to warn you, so leave room to step the lane sideways.
+      const braking =
+        !dropped && piece.anchorDist <= CORE_RADIUS + RING_HEIGHT * (INNER_SLOW_ZONE_RINGS + 0.5);
+      const speedFactor = dropped ? SOFT_DROP_SPEED_FACTOR : braking ? INNER_RING_SLOW_FACTOR : 1;
+      piece.anchorDist -= piece.speed * dt * speedFactor;
 
       // Rest on the surface instead of locking instantly: the grace window
       // lets the player step or spin at the last moment to intertwine.
@@ -530,6 +570,7 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
       const lockRing = lockRingFor(piece.cells, baseSector);
       updateGhost(piece, baseSector, lockRing);
       const restDist = CORE_RADIUS + (lockRing + 0.5) * RING_HEIGHT;
+      const lockDelay = opts.demo ? 0 : lockRing === 0 ? INNER_LOCK_DELAY_MS : LOCK_DELAY_MS;
       if (piece.hardDropped) {
         // Slam to the rest position and lock this frame — leave a streak of
         // trail dots along the travelled path so the slam reads visually.
