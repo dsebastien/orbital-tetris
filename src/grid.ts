@@ -58,6 +58,11 @@ export interface ClearableRun {
   readonly fullRing: boolean;
 }
 
+/** Remove a single cell — bomb detonations. Holes are allowed by design. */
+export const clearCell = (grid: Grid, ring: number, sector: number): void => {
+  setCell(grid, ring, sector, null);
+};
+
 /**
  * Find every contiguous occupied arc of at least CLEAR_RUN_LENGTH cells —
  * the "correctly assembled" condition. Runs wrap around the circle; a fully

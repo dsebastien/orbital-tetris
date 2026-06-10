@@ -40,7 +40,11 @@ past the dashed boundary, the run is over.
   clearing several arcs at once multiplies the total. Cells outward of a cleared
   cell slide one ring inward.
 - Scoring: 20 points per locked piece, 15 points per cleared cell (×2 for a full
-  ring, ×N for N simultaneous arcs).
+  ring, ×N for N simultaneous arcs). Consecutive clearing locks build a combo
+  multiplier, and arcs joined by the inward collapse chain as cascades.
+- Special pieces: from level 4, **golden** tetrominoes are worth a ×5 lock
+  bonus; from level 8, single-cell **bombs** blast the 3×3 polar patch where
+  they land instead of binding.
 - 100 levels: piece speed, spawn rate, concurrent pieces and arcs required all
   ramp up. Speed only changes when a new level starts.
 - Game over when a piece would lock beyond the field boundary. Then: **Continue** (retry

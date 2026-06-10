@@ -1,6 +1,9 @@
 import { Actor, Circle, Color, Engine, Keys, Scene, Vector, vec } from 'excalibur';
 import {
   BIND_TWEEN_MS,
+  BOMB_CHANCE,
+  BOMB_COLOR,
+  BOMB_MIN_LEVEL,
   CASCADE_CHECK_DELAY_MS,
   CENTER_X,
   CENTER_Y,
@@ -19,6 +22,10 @@ import {
   DEMO_ROTATION_FACTOR,
   FLASH_FULL_RING_OPACITY,
   FULL_RING_MULTIPLIER,
+  GOLDEN_CHANCE,
+  GOLDEN_COLOR,
+  GOLDEN_LOCK_MULTIPLIER,
+  GOLDEN_MIN_LEVEL,
   INNER_LOCK_DELAY_MS,
   INNER_RING_SLOW_FACTOR,
   INNER_SLOW_ZONE_RINGS,
@@ -27,6 +34,7 @@ import {
   PIECE_ALIGN_SPEED,
   RING_HEIGHT,
   ROTATION_SPEED,
+  SCORE_PER_BOMBED_CELL,
   SCORE_PER_CLEARED_CELL,
   SCORE_PER_PIECE,
   SECTOR_ANGLE,
@@ -59,6 +67,7 @@ import { createParticleSystem } from './fx/particles';
 import { sfx } from './fx/sound';
 import {
   cellAt,
+  clearCell,
   clearRuns,
   createGrid,
   findClearableRuns,
@@ -153,7 +162,29 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
   let dyingTweens: DyingTween[] = [];
   let collapseTweens: CollapseTween[] = [];
   const drawFromBag = createBag();
-  let nextShape: PieceShape = drawFromBag();
+
+  interface NextPiece {
+    readonly shape: PieceShape;
+    readonly special?: 'golden' | 'bomb';
+  }
+
+  /** Specials are decided at draw time so the preview shows what's coming. */
+  const drawNext = (): NextPiece => {
+    const roll = Math.random();
+    if (config.level >= BOMB_MIN_LEVEL && roll < BOMB_CHANCE) {
+      return {
+        shape: { name: 'BOMB', color: BOMB_COLOR, cells: [{ s: 0, r: 0 }] },
+        special: 'bomb',
+      };
+    }
+    const shape = drawFromBag();
+    if (config.level >= GOLDEN_MIN_LEVEL && roll < BOMB_CHANCE + GOLDEN_CHANCE) {
+      return { shape: { ...shape, color: GOLDEN_COLOR }, special: 'golden' };
+    }
+    return { shape };
+  };
+
+  let next: NextPiece = { shape: drawFromBag() };
   /** Entry angle telegraphed by the rim marker before the next spawn. */
   let pendingAngle: number | null = null;
   let marker: Actor | null = null;
@@ -355,11 +386,14 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
     coreAngle + (sectorAtAngle(piece.anchorAngle, targetCoreAngle) + 0.5) * SECTOR_ANGLE;
 
   const spawnPiece = (): void => {
-    const shape = opts.demo ? randomShape() : nextShape;
+    const shape = opts.demo ? randomShape() : next.shape;
     const angle = opts.demo
       ? demoSpawnAngle(shape.cells)
       : pendingAngle ?? Math.random() * Math.PI * 2;
     const piece = createFallingPiece(shape, angle, SPAWN_RADIUS, config.blockSpeed);
+    if (!opts.demo) {
+      piece.special = next.special;
+    }
     piece.displayAngle = laneAngleFor(piece);
     positionPiece(piece);
     scene.add(piece.root);
@@ -367,8 +401,8 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
     if (!opts.demo) {
       pendingAngle = null;
       killMarker();
-      nextShape = drawFromBag();
-      opts.onNextShape?.(nextShape);
+      next = drawNext();
+      opts.onNextShape?.(next.shape);
     }
   };
 
@@ -452,7 +486,43 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
     return true;
   };
 
+  /** Bomb contact: blast the 3x3 polar patch around the contact cell. */
+  const detonate = (piece: FallingPiece, baseSector: number, lockRing: number): void => {
+    removePiece(piece);
+    const centerRing = Math.min(lockRing, MAX_RINGS - 1);
+    let destroyed = 0;
+    for (let ring = centerRing - 1; ring <= centerRing + 1; ring++) {
+      if (ring < 0 || ring >= MAX_RINGS) {
+        continue;
+      }
+      for (let ds = -1; ds <= 1; ds++) {
+        const sector = (baseSector + ds + SECTOR_COUNT) % SECTOR_COUNT;
+        const cell = cellAt(grid, ring, sector);
+        if (cell) {
+          fx.burst(worldBoundPos(ring, sector), cell.color, 8);
+          clearCell(grid, ring, sector);
+          destroyed += 1;
+        }
+      }
+    }
+    const blastPos = worldBoundPos(centerRing, baseSector);
+    fx.burst(blastPos, BOMB_COLOR, 16);
+    fx.shockwave(vec(CENTER_X, CENTER_Y), CORE_RADIUS + (centerRing + 0.5) * RING_HEIGHT, BOMB_COLOR);
+    scene.camera.shake(SHAKE_CLEAR_MAG, SHAKE_CLEAR_MAG, SHAKE_CLEAR_MS);
+    sfx.hardDrop();
+    rebuildBound();
+    if (destroyed > 0) {
+      const gained = destroyed * SCORE_PER_BOMBED_CELL;
+      score += gained;
+      fx.popup(blastPos, `+${gained}`, BOMB_COLOR);
+    }
+  };
+
   const lockPiece = (piece: FallingPiece, baseSector: number, lockRing: number): void => {
+    if (piece.special === 'bomb' && !opts.demo) {
+      detonate(piece, baseSector, lockRing);
+      return;
+    }
     const placements: LockCell[] = piece.cells.map((cell) => ({
       sector: (baseSector + cell.s) % SECTOR_COUNT,
       ring: lockRing + cell.r,
@@ -491,7 +561,16 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
       fx.burst(worldBoundPos(placement.ring, placement.sector), placement.color, 7);
     }
     updateDanger();
-    score += SCORE_PER_PIECE;
+    if (piece.special === 'golden') {
+      const bonus = SCORE_PER_PIECE * GOLDEN_LOCK_MULTIPLIER;
+      score += bonus;
+      const first = placements[0];
+      if (first) {
+        fx.popup(worldBoundPos(first.ring, first.sector), `GOLD +${bonus}`, GOLDEN_COLOR);
+      }
+    } else {
+      score += SCORE_PER_PIECE;
+    }
     if (handleClears()) {
       combo += 1;
       locksSinceClear = 0;
@@ -678,7 +757,7 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
       spawnTimer >= interval - SPAWN_TELEGRAPH_MS
     ) {
       pendingAngle = Math.random() * Math.PI * 2;
-      showMarker(pendingAngle, nextShape.color);
+      showMarker(pendingAngle, next.shape.color);
     }
     if (marker) {
       marker.graphics.opacity = 0.45 + 0.55 * Math.abs(Math.sin(aliveTimer * 0.008));
@@ -776,7 +855,7 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
     rebuildBound();
     fx.clear();
     if (!opts.demo) {
-      opts.onNextShape?.(nextShape);
+      opts.onNextShape?.(next.shape);
     }
   };
 

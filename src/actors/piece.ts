@@ -12,6 +12,8 @@ import type { PieceCell, PieceShape } from '../types';
 export interface FallingPiece {
   cells: PieceCell[];
   readonly color: string;
+  /** Golden pieces score a multiplied lock bonus; bombs blast a patch instead of binding. */
+  special?: 'golden' | 'bomb';
   /** World-space angle of the s=0 cell column (fixed — the core rotates, not the piece). */
   readonly anchorAngle: number;
   /**

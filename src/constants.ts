@@ -118,6 +118,18 @@ export const COMBO_RESET_LOCKS = 2;
 /** Re-check for collapse-triggered (cascade) clears once the slide animation has settled. */
 export const CASCADE_CHECK_DELAY_MS = COLLAPSE_DELAY_MS + COLLAPSE_SLIDE_MS + 60;
 
+// --- Special pieces ---
+/** Golden tetrominoes appear from this level, worth a multiplied lock bonus. */
+export const GOLDEN_MIN_LEVEL = 4;
+export const GOLDEN_CHANCE = 0.06;
+export const GOLDEN_COLOR = '#ffd700';
+export const GOLDEN_LOCK_MULTIPLIER = 5;
+/** Bombs appear from this level: a single cell that blasts a 3x3 polar patch. */
+export const BOMB_MIN_LEVEL = 8;
+export const BOMB_CHANCE = 0.05;
+export const BOMB_COLOR = '#ff3860';
+export const SCORE_PER_BOMBED_CELL = 10;
+
 // --- Demo (main-menu attract mode) ---
 export const DEMO_BLOCK_SPEED = 110;
 export const DEMO_SPAWN_INTERVAL_MS = 1400;
