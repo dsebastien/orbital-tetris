@@ -30,6 +30,8 @@ export const CORE_STEP_DAS_DELAY_MS = 220;
 export const CORE_STEP_REPEAT_MS = 140;
 /** Taps in the top fraction of the screen spin the piece instead of the core. */
 export const PIECE_ROTATE_TOUCH_ZONE = 0.3;
+/** Left-stick deflection beyond this counts as a lane-step direction. */
+export const GAMEPAD_STICK_DEADZONE = 0.4;
 /** How fast a falling piece's displayed angle tracks its landing lane (1/s). */
 export const PIECE_ALIGN_SPEED = 10;
 /**

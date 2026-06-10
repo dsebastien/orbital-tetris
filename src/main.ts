@@ -17,6 +17,8 @@ const game = new Engine({
   pixelRatio: Math.max(2, window.devicePixelRatio || 1),
 });
 
+game.input.gamepads.enabled = true;
+
 game.add('menu', new MenuScene());
 game.add('game', new GameScene());
 game.add('gameover', new GameOverScene());

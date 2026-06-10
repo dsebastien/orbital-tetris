@@ -1,4 +1,4 @@
-import { Actor, Circle, Color, Engine, Keys, Scene, Vector, vec } from 'excalibur';
+import { Actor, Axes, Buttons, Circle, Color, Engine, Keys, Scene, Vector, vec } from 'excalibur';
 import {
   BIND_TWEEN_MS,
   BOMB_CHANCE,
@@ -22,6 +22,7 @@ import {
   DEMO_ROTATION_FACTOR,
   FLASH_FULL_RING_OPACITY,
   FULL_RING_MULTIPLIER,
+  GAMEPAD_STICK_DEADZONE,
   GOLDEN_CHANCE,
   GOLDEN_COLOR,
   GOLDEN_LOCK_MULTIPLIER,
@@ -691,12 +692,21 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
       coreAngle += ROTATION_SPEED * DEMO_ROTATION_FACTOR * dt;
       targetCoreAngle = coreAngle;
     } else {
+      const pad = engine.input.gamepads.at(0);
+      const stickX = pad.connected ? pad.getAxes(Axes.LeftStickX) : 0;
       let dir: -1 | 0 | 1 = rotationInput;
-      if (engine.input.keyboard.isHeld(Keys.Left) || engine.input.keyboard.isHeld(Keys.A)) {
+      if (
+        engine.input.keyboard.isHeld(Keys.Left) ||
+        engine.input.keyboard.isHeld(Keys.A) ||
+        pad.isButtonHeld(Buttons.DpadLeft) ||
+        stickX < -GAMEPAD_STICK_DEADZONE
+      ) {
         dir = -1;
       } else if (
         engine.input.keyboard.isHeld(Keys.Right) ||
-        engine.input.keyboard.isHeld(Keys.D)
+        engine.input.keyboard.isHeld(Keys.D) ||
+        pad.isButtonHeld(Buttons.DpadRight) ||
+        stickX > GAMEPAD_STICK_DEADZONE
       ) {
         dir = 1;
       }
@@ -715,14 +725,20 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
         }
       }
       coreAngle += shortestAngleDelta(coreAngle, targetCoreAngle) * Math.min(1, dt * CORE_SNAP_SPEED);
-      if (engine.input.keyboard.wasPressed(Keys.Up) || engine.input.keyboard.wasPressed(Keys.W)) {
+      if (
+        engine.input.keyboard.wasPressed(Keys.Up) ||
+        engine.input.keyboard.wasPressed(Keys.W) ||
+        pad.wasButtonPressed(Buttons.Face1)
+      ) {
         rotateActivePiece();
       }
-      if (engine.input.keyboard.wasPressed(Keys.Space)) {
+      if (engine.input.keyboard.wasPressed(Keys.Space) || pad.wasButtonPressed(Buttons.Face2)) {
         hardDropActivePiece();
       }
       softDrop =
-        engine.input.keyboard.isHeld(Keys.Down) || engine.input.keyboard.isHeld(Keys.S);
+        engine.input.keyboard.isHeld(Keys.Down) ||
+        engine.input.keyboard.isHeld(Keys.S) ||
+        pad.isButtonHeld(Buttons.DpadDown);
     }
     core.root.rotation = coreAngle;
 
