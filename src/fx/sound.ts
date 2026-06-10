@@ -118,64 +118,181 @@ export const sfx = {
   },
 };
 
-interface MusicNodes {
-  readonly oscillators: OscillatorNode[];
-  readonly gain: GainNode;
+// --- Keygen-style chiptune loop -------------------------------------------
+// A tiny tracker: 4 bars of 16 sixteenth-steps, square-wave arpeggios fed
+// through a dotted-eighth feedback delay, sawtooth bass, kick/snare/hat from
+// oscillators and a noise buffer. Scheduled with the classic lookahead
+// pattern so timing stays sample-accurate while the tab is busy.
+
+const BPM = 142;
+const STEP_DUR = 60 / BPM / 4;
+const STEPS_PER_BAR = 16;
+
+/** MIDI note number to frequency. */
+const midi = (note: number): number => 440 * 2 ** ((note - 69) / 12);
+
+/** Am — F — C — G, the eternal cracktro progression. */
+const PROGRESSION: readonly { readonly root: number; readonly chord: readonly number[] }[] = [
+  { root: 33, chord: [57, 60, 64] }, // A1 | A3 C4 E4
+  { root: 29, chord: [53, 57, 60] }, // F1 | F3 A3 C4
+  { root: 36, chord: [60, 64, 67] }, // C2 | C4 E4 G4
+  { root: 31, chord: [55, 59, 62] }, // G1 | G3 B3 D4
+];
+
+let noiseBuffer: AudioBuffer | null = null;
+
+const getNoise = (audio: AudioContext): AudioBuffer => {
+  if (!noiseBuffer) {
+    noiseBuffer = audio.createBuffer(1, Math.floor(audio.sampleRate * 0.2), audio.sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < data.length; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+  }
+  return noiseBuffer;
+};
+
+interface MusicBus {
+  readonly out: GainNode;
+  readonly delaySend: GainNode;
 }
 
-let musicNodes: MusicNodes | null = null;
+let musicBus: MusicBus | null = null;
+let musicTimer: number | null = null;
 
-/**
- * Generative ambient bed: three detuned drones through a lowpass filter,
- * breathing slowly via a sub-hertz LFO on the bed gain. Mute is handled by
- * the master gain, so the bed obeys the M toggle like everything else.
- */
+const note = (
+  audio: AudioContext,
+  when: number,
+  frequency: number,
+  durationS: number,
+  type: OscillatorType,
+  volume: number,
+  dest: AudioNode,
+  slideTo?: number
+): void => {
+  const osc = audio.createOscillator();
+  osc.type = type;
+  osc.frequency.setValueAtTime(frequency, when);
+  if (slideTo !== undefined) {
+    osc.frequency.exponentialRampToValueAtTime(slideTo, when + durationS);
+  }
+  const gain = audio.createGain();
+  gain.gain.setValueAtTime(volume, when);
+  gain.gain.exponentialRampToValueAtTime(0.001, when + durationS);
+  osc.connect(gain).connect(dest);
+  osc.start(when);
+  osc.stop(when + durationS + 0.02);
+};
+
+const hit = (
+  audio: AudioContext,
+  when: number,
+  durationS: number,
+  volume: number,
+  filterType: BiquadFilterType,
+  filterFreq: number,
+  dest: AudioNode
+): void => {
+  const source = audio.createBufferSource();
+  source.buffer = getNoise(audio);
+  const filter = audio.createBiquadFilter();
+  filter.type = filterType;
+  filter.frequency.value = filterFreq;
+  const gain = audio.createGain();
+  gain.gain.setValueAtTime(volume, when);
+  gain.gain.exponentialRampToValueAtTime(0.001, when + durationS);
+  source.connect(filter).connect(gain).connect(dest);
+  source.start(when);
+  source.stop(when + durationS + 0.02);
+};
+
+const scheduleStep = (audio: AudioContext, bus: MusicBus, step: number, when: number): void => {
+  const bar = PROGRESSION[Math.floor(step / STEPS_PER_BAR) % PROGRESSION.length]!;
+  const pos = step % STEPS_PER_BAR;
+
+  // Arpeggio: chord tones cycling every 16th, hopping octaves — the keygen
+  // signature. Also feeds the delay bus for the trailing echo.
+  const arpTone = bar.chord[pos % 3]! + 12 * (pos % 2) + 12;
+  note(audio, when, midi(arpTone), STEP_DUR * 0.9, 'square', 0.055, bus.out);
+  note(audio, when, midi(arpTone), STEP_DUR * 0.9, 'square', 0.045, bus.delaySend);
+
+  // Octave stab at the top of each bar, sustained into the delay.
+  if (pos === 0) {
+    note(audio, when, midi(bar.chord[0]! + 24), STEP_DUR * 3, 'triangle', 0.12, bus.delaySend);
+  }
+
+  // Bass: driving eighths, jumping the octave on the offbeat.
+  if (pos % 2 === 0) {
+    note(audio, when, midi(bar.root + (pos % 4 === 2 ? 12 : 0)), STEP_DUR * 1.6, 'sawtooth', 0.13, bus.out);
+  }
+
+  // Drums: four-on-the-floor kick, snare on 2 and 4, hats on the offbeats.
+  if (pos % 4 === 0) {
+    note(audio, when, 160, 0.11, 'sine', 0.5, bus.out, 45);
+  }
+  if (pos === 4 || pos === 12) {
+    hit(audio, when, 0.1, 0.16, 'bandpass', 1800, bus.out);
+  }
+  if (pos % 2 === 1) {
+    hit(audio, when, 0.03, 0.045, 'highpass', 7000, bus.out);
+  }
+};
+
 export const music = {
   start(): void {
     const audio = ensureContext();
-    if (!audio || !master || musicNodes) {
+    if (!audio || !master || musicTimer !== null) {
       return;
     }
-    const gain = audio.createGain();
-    gain.gain.value = 0.045;
-    const filter = audio.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.value = 520;
-    gain.connect(filter);
-    filter.connect(master);
+    const out = audio.createGain();
+    out.gain.value = 0.5;
+    out.connect(master);
 
-    const oscillators = [55, 110, 164.81].map((frequency, i) => {
-      const osc = audio.createOscillator();
-      osc.type = i === 0 ? 'sine' : 'triangle';
-      osc.frequency.value = frequency;
-      osc.detune.value = (i - 1) * 4;
-      osc.connect(gain);
-      osc.start();
-      return osc;
-    });
+    // Dotted-eighth feedback delay — instant cracktro.
+    const delaySend = audio.createGain();
+    const delay = audio.createDelay(1);
+    delay.delayTime.value = STEP_DUR * 3;
+    const feedback = audio.createGain();
+    feedback.gain.value = 0.32;
+    const wet = audio.createGain();
+    wet.gain.value = 0.3;
+    delaySend.connect(delay);
+    delay.connect(feedback);
+    feedback.connect(delay);
+    delay.connect(wet);
+    wet.connect(out);
 
-    const lfo = audio.createOscillator();
-    lfo.frequency.value = 0.06;
-    const lfoDepth = audio.createGain();
-    lfoDepth.gain.value = 0.02;
-    lfo.connect(lfoDepth);
-    lfoDepth.connect(gain.gain);
-    lfo.start();
-    oscillators.push(lfo);
+    musicBus = { out, delaySend };
 
-    musicNodes = { oscillators, gain };
+    const totalSteps = PROGRESSION.length * STEPS_PER_BAR;
+    let step = 0;
+    let nextTime = audio.currentTime + 0.05;
+    const tick = (): void => {
+      if (!musicBus) {
+        return;
+      }
+      while (nextTime < audio.currentTime + 0.2) {
+        scheduleStep(audio, musicBus, step, nextTime);
+        step = (step + 1) % totalSteps;
+        nextTime += STEP_DUR;
+      }
+    };
+    tick();
+    musicTimer = window.setInterval(tick, 50);
   },
 
   stop(): void {
-    if (!ctx || !musicNodes) {
-      return;
+    if (musicTimer !== null) {
+      window.clearInterval(musicTimer);
+      musicTimer = null;
     }
-    const now = ctx.currentTime;
-    musicNodes.gain.gain.setValueAtTime(musicNodes.gain.gain.value, now);
-    musicNodes.gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.8);
-    for (const osc of musicNodes.oscillators) {
-      osc.stop(now + 1);
+    if (ctx && musicBus) {
+      const bus = musicBus;
+      const now = ctx.currentTime;
+      bus.out.gain.setValueAtTime(bus.out.gain.value, now);
+      bus.out.gain.exponentialRampToValueAtTime(0.0001, now + 0.5);
+      window.setTimeout(() => bus.out.disconnect(), 700);
     }
-    musicNodes = null;
+    musicBus = null;
   },
 };
