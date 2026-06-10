@@ -12,6 +12,9 @@ const game = new Engine({
   backgroundColor: Color.fromHex(COLOR_BACKGROUND),
   canvasElementId: 'game',
   suppressPlayButton: true,
+  // FitScreen stretches the backing buffer over the viewport; render at a
+  // pixel ratio of at least 2 so text and vector art stay crisp.
+  pixelRatio: Math.max(2, window.devicePixelRatio || 1),
 });
 
 game.add('menu', new MenuScene());

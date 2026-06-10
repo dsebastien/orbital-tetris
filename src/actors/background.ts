@@ -1,5 +1,6 @@
-import { Actor, Canvas, Scene, vec } from 'excalibur';
+import { Actor, Scene, vec } from 'excalibur';
 import { CENTER_X, CENTER_Y, GAME_HEIGHT, GAME_WIDTH } from '../constants';
+import { crispCanvas } from '../fx/canvas';
 
 export interface Background {
   /** Drives the twinkle of the second star layer. */
@@ -44,55 +45,38 @@ export const createBackground = (scene: Scene): Background => {
 
   const deep = new Actor({ pos: center, z: 0 });
   deep.graphics.use(
-    new Canvas({
-      width: GAME_WIDTH,
-      height: GAME_HEIGHT,
-      cache: true,
-      draw: (ctx) => {
-        for (const [x, y, radius, rgb] of NEBULAE) {
-          const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
-          gradient.addColorStop(0, `rgba(${rgb}, 0.12)`);
-          gradient.addColorStop(1, `rgba(${rgb}, 0)`);
-          ctx.fillStyle = gradient;
-          ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
-        }
-        drawStars(ctx, 42, 150);
-      },
+    crispCanvas(GAME_WIDTH, GAME_HEIGHT, (ctx) => {
+      for (const [x, y, radius, rgb] of NEBULAE) {
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
+        gradient.addColorStop(0, `rgba(${rgb}, 0.12)`);
+        gradient.addColorStop(1, `rgba(${rgb}, 0)`);
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+      }
+      drawStars(ctx, 42, 150);
     })
   );
   scene.add(deep);
 
   const twinkle = new Actor({ pos: center, z: 1 });
-  twinkle.graphics.use(
-    new Canvas({
-      width: GAME_WIDTH,
-      height: GAME_HEIGHT,
-      cache: true,
-      draw: (ctx) => drawStars(ctx, 1337, 70),
-    })
-  );
+  twinkle.graphics.use(crispCanvas(GAME_WIDTH, GAME_HEIGHT, (ctx) => drawStars(ctx, 1337, 70)));
   scene.add(twinkle);
 
   const vignette = new Actor({ pos: center, z: 35 });
   vignette.graphics.use(
-    new Canvas({
-      width: GAME_WIDTH,
-      height: GAME_HEIGHT,
-      cache: true,
-      draw: (ctx) => {
-        const gradient = ctx.createRadialGradient(
-          CENTER_X,
-          CENTER_Y,
-          GAME_WIDTH * 0.32,
-          CENTER_X,
-          CENTER_Y,
-          GAME_WIDTH * 0.74
-        );
-        gradient.addColorStop(0, 'rgba(4, 6, 16, 0)');
-        gradient.addColorStop(1, 'rgba(4, 6, 16, 0.5)');
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
-      },
+    crispCanvas(GAME_WIDTH, GAME_HEIGHT, (ctx) => {
+      const gradient = ctx.createRadialGradient(
+        CENTER_X,
+        CENTER_Y,
+        GAME_WIDTH * 0.32,
+        CENTER_X,
+        CENTER_Y,
+        GAME_WIDTH * 0.74
+      );
+      gradient.addColorStop(0, 'rgba(4, 6, 16, 0)');
+      gradient.addColorStop(1, 'rgba(4, 6, 16, 0.5)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
     })
   );
   scene.add(vignette);

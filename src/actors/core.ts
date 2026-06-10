@@ -1,4 +1,4 @@
-import { Actor, Canvas, Circle, Color, Vector, vec } from 'excalibur';
+import { Actor, Circle, Color, Vector, vec } from 'excalibur';
 import {
   CENTER_X,
   CENTER_Y,
@@ -14,6 +14,7 @@ import {
   SECTOR_ANGLE,
   SECTOR_COUNT,
 } from '../constants';
+import { crispCanvas } from '../fx/canvas';
 import { withAlpha } from '../fx/palette';
 
 export interface CoreVisual {
@@ -34,24 +35,19 @@ export const createCoreVisual = (): CoreVisual => {
   const haloRadius = CORE_RADIUS * 2.4;
   const halo = new Actor({ z: 3 });
   halo.graphics.use(
-    new Canvas({
-      width: haloRadius * 2,
-      height: haloRadius * 2,
-      cache: true,
-      draw: (ctx) => {
-        const gradient = ctx.createRadialGradient(
-          haloRadius,
-          haloRadius,
-          CORE_RADIUS * 0.5,
-          haloRadius,
-          haloRadius,
-          haloRadius
-        );
-        gradient.addColorStop(0, withAlpha(COLOR_ACCENT, 0.22));
-        gradient.addColorStop(1, withAlpha(COLOR_ACCENT, 0));
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, haloRadius * 2, haloRadius * 2);
-      },
+    crispCanvas(haloRadius * 2, haloRadius * 2, (ctx) => {
+      const gradient = ctx.createRadialGradient(
+        haloRadius,
+        haloRadius,
+        CORE_RADIUS * 0.5,
+        haloRadius,
+        haloRadius,
+        haloRadius
+      );
+      gradient.addColorStop(0, withAlpha(COLOR_ACCENT, 0.22));
+      gradient.addColorStop(1, withAlpha(COLOR_ACCENT, 0));
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, haloRadius * 2, haloRadius * 2);
     })
   );
   root.addChild(halo);
@@ -60,70 +56,60 @@ export const createCoreVisual = (): CoreVisual => {
   const size = FIELD_LIMIT_RADIUS * 2 + 8;
   const guides = new Actor({ z: 4 });
   guides.graphics.use(
-    new Canvas({
-      width: size,
-      height: size,
-      cache: true,
-      draw: (ctx) => {
-        const center = size / 2;
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.07)';
-        ctx.lineWidth = 1;
-        for (let sector = 0; sector < SECTOR_COUNT; sector++) {
-          const angle = sector * SECTOR_ANGLE;
-          ctx.beginPath();
-          ctx.moveTo(
-            center + Math.cos(angle) * CORE_RADIUS,
-            center + Math.sin(angle) * CORE_RADIUS
-          );
-          ctx.lineTo(
-            center + Math.cos(angle) * FIELD_LIMIT_RADIUS,
-            center + Math.sin(angle) * FIELD_LIMIT_RADIUS
-          );
-          ctx.stroke();
-        }
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-        for (let ring = 1; ring < MAX_RINGS; ring++) {
-          ctx.beginPath();
-          ctx.arc(center, center, CORE_RADIUS + ring * RING_HEIGHT, 0, Math.PI * 2);
-          ctx.stroke();
-        }
-        ctx.setLineDash([6, 10]);
-        ctx.strokeStyle = 'rgba(255, 80, 80, 0.4)';
-        ctx.lineWidth = 1.5;
+    crispCanvas(size, size, (ctx) => {
+      const center = size / 2;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.07)';
+      ctx.lineWidth = 1;
+      for (let sector = 0; sector < SECTOR_COUNT; sector++) {
+        const angle = sector * SECTOR_ANGLE;
         ctx.beginPath();
-        ctx.arc(center, center, FIELD_LIMIT_RADIUS, 0, Math.PI * 2);
+        ctx.moveTo(
+          center + Math.cos(angle) * CORE_RADIUS,
+          center + Math.sin(angle) * CORE_RADIUS
+        );
+        ctx.lineTo(
+          center + Math.cos(angle) * FIELD_LIMIT_RADIUS,
+          center + Math.sin(angle) * FIELD_LIMIT_RADIUS
+        );
         ctx.stroke();
-      },
+      }
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+      for (let ring = 1; ring < MAX_RINGS; ring++) {
+        ctx.beginPath();
+        ctx.arc(center, center, CORE_RADIUS + ring * RING_HEIGHT, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.setLineDash([6, 10]);
+      ctx.strokeStyle = 'rgba(255, 80, 80, 0.4)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(center, center, FIELD_LIMIT_RADIUS, 0, Math.PI * 2);
+      ctx.stroke();
     })
   );
   root.addChild(guides);
 
   const disc = new Actor({ z: 6 });
   disc.graphics.use(
-    new Canvas({
-      width: CORE_RADIUS * 2 + 8,
-      height: CORE_RADIUS * 2 + 8,
-      cache: true,
-      draw: (ctx) => {
-        const center = CORE_RADIUS + 4;
-        const gradient = ctx.createRadialGradient(
-          center - CORE_RADIUS * 0.3,
-          center - CORE_RADIUS * 0.3,
-          CORE_RADIUS * 0.1,
-          center,
-          center,
-          CORE_RADIUS
-        );
-        gradient.addColorStop(0, COLOR_CORE_FILL_LIGHT);
-        gradient.addColorStop(1, COLOR_CORE_FILL);
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.arc(center, center, CORE_RADIUS, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.lineWidth = 2.5;
-        ctx.strokeStyle = COLOR_CORE_STROKE;
-        ctx.stroke();
-      },
+    crispCanvas(CORE_RADIUS * 2 + 8, CORE_RADIUS * 2 + 8, (ctx) => {
+      const center = CORE_RADIUS + 4;
+      const gradient = ctx.createRadialGradient(
+        center - CORE_RADIUS * 0.3,
+        center - CORE_RADIUS * 0.3,
+        CORE_RADIUS * 0.1,
+        center,
+        center,
+        CORE_RADIUS
+      );
+      gradient.addColorStop(0, COLOR_CORE_FILL_LIGHT);
+      gradient.addColorStop(1, COLOR_CORE_FILL);
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(center, center, CORE_RADIUS, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = COLOR_CORE_STROKE;
+      ctx.stroke();
     })
   );
   root.addChild(disc);
@@ -138,19 +124,14 @@ export const createCoreVisual = (): CoreVisual => {
   const spinnerRadius = CORE_RADIUS * 0.78;
   const spinner = new Actor({ z: 8 });
   spinner.graphics.use(
-    new Canvas({
-      width: spinnerRadius * 2 + 6,
-      height: spinnerRadius * 2 + 6,
-      cache: true,
-      draw: (ctx) => {
-        const center = spinnerRadius + 3;
-        ctx.setLineDash([10, 14]);
-        ctx.strokeStyle = withAlpha(COLOR_ACCENT, 0.5);
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(center, center, spinnerRadius, 0, Math.PI * 2);
-        ctx.stroke();
-      },
+    crispCanvas(spinnerRadius * 2 + 6, spinnerRadius * 2 + 6, (ctx) => {
+      const center = spinnerRadius + 3;
+      ctx.setLineDash([10, 14]);
+      ctx.strokeStyle = withAlpha(COLOR_ACCENT, 0.5);
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(center, center, spinnerRadius, 0, Math.PI * 2);
+      ctx.stroke();
     })
   );
   root.addChild(spinner);
