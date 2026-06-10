@@ -11,7 +11,10 @@ export interface ButtonOptions {
 }
 
 export const createButton = (opts: ButtonOptions): Actor => {
-  const width = opts.width ?? 300;
+  const fontSize = opts.fontSize ?? 26;
+  // Monospace glyphs are ~0.6em wide; never let the caption overflow the box.
+  const minWidth = Math.ceil(opts.label.length * fontSize * 0.62) + 48;
+  const width = Math.max(opts.width ?? 300, minWidth);
   const height = opts.height ?? 60;
   const button = new Actor({ pos: opts.pos, width, height, z: 50 });
   button.graphics.use(
@@ -32,7 +35,7 @@ export const createButton = (opts: ButtonOptions): Actor => {
       // graphic on the actor; combining both shifts the caption off-center.
       font: new Font({
         family: 'monospace',
-        size: opts.fontSize ?? 26,
+        size: fontSize,
         unit: FontUnit.Px,
         color: Color.White,
         bold: true,
