@@ -3,6 +3,8 @@
 Circular Tetris built with [Excalibur.js](https://excaliburjs.com), TypeScript and Vite
 (based on the [template-ts-vite](https://github.com/excaliburjs/template-ts-vite) setup).
 
+**▶ Play it: <https://dsebastien.github.io/orbital-tetris/>**
+
 ![Orbital Tetris main menu](docs/screenshot.png)
 
 The seven classic tetrominoes — rounded into ring-segment cells that fit the circle —
