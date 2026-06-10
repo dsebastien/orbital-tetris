@@ -58,9 +58,16 @@ const tone = (frequency: number, opts: ToneOptions = {}): void => {
 const ARPEGGIO = [523.25, 659.25, 783.99, 1046.5, 1318.5];
 
 export const sfx = {
-  /** Returns the new muted state. */
+  /** Returns the new muted state. Also gates the continuous music bed. */
   toggleMuted(): boolean {
     muted = !muted;
+    if (master) {
+      master.gain.value = muted ? 0 : 0.4;
+    }
+    return muted;
+  },
+
+  isMuted(): boolean {
     return muted;
   },
 
@@ -108,5 +115,67 @@ export const sfx = {
   /** Long falling sweep when the run ends. */
   gameOver(): void {
     tone(300, { type: 'sawtooth', durationMs: 900, volume: 0.3, slideTo: 40 });
+  },
+};
+
+interface MusicNodes {
+  readonly oscillators: OscillatorNode[];
+  readonly gain: GainNode;
+}
+
+let musicNodes: MusicNodes | null = null;
+
+/**
+ * Generative ambient bed: three detuned drones through a lowpass filter,
+ * breathing slowly via a sub-hertz LFO on the bed gain. Mute is handled by
+ * the master gain, so the bed obeys the M toggle like everything else.
+ */
+export const music = {
+  start(): void {
+    const audio = ensureContext();
+    if (!audio || !master || musicNodes) {
+      return;
+    }
+    const gain = audio.createGain();
+    gain.gain.value = 0.045;
+    const filter = audio.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 520;
+    gain.connect(filter);
+    filter.connect(master);
+
+    const oscillators = [55, 110, 164.81].map((frequency, i) => {
+      const osc = audio.createOscillator();
+      osc.type = i === 0 ? 'sine' : 'triangle';
+      osc.frequency.value = frequency;
+      osc.detune.value = (i - 1) * 4;
+      osc.connect(gain);
+      osc.start();
+      return osc;
+    });
+
+    const lfo = audio.createOscillator();
+    lfo.frequency.value = 0.06;
+    const lfoDepth = audio.createGain();
+    lfoDepth.gain.value = 0.02;
+    lfo.connect(lfoDepth);
+    lfoDepth.connect(gain.gain);
+    lfo.start();
+    oscillators.push(lfo);
+
+    musicNodes = { oscillators, gain };
+  },
+
+  stop(): void {
+    if (!ctx || !musicNodes) {
+      return;
+    }
+    const now = ctx.currentTime;
+    musicNodes.gain.gain.setValueAtTime(musicNodes.gain.gain.value, now);
+    musicNodes.gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.8);
+    for (const osc of musicNodes.oscillators) {
+      osc.stop(now + 1);
+    }
+    musicNodes = null;
   },
 };

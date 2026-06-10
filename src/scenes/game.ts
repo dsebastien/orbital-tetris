@@ -13,13 +13,14 @@ import {
   BANNER_DURATION_MS,
   CENTER_X,
   CENTER_Y,
+  COLOR_TEXT_MUTED,
   COLOR_WARNING,
   GAME_HEIGHT,
   MAX_LEVEL,
   PIECE_ROTATE_TOUCH_ZONE,
 } from '../constants';
 import { createField, type Field } from '../field';
-import { sfx } from '../fx/sound';
+import { music, sfx } from '../fx/sound';
 import { getLevelConfig } from '../levels';
 import { createHud, type Hud } from '../ui/hud';
 import type { GameOverData, GameStartData } from '../types';
@@ -28,6 +29,7 @@ export class GameScene extends Scene {
   private field!: Field;
   private hud!: Hud;
   private banner!: Label;
+  private muteLabel!: Label;
   private level = 1;
   private arcsCleared = 0;
   private bannerTimer = 0;
@@ -64,6 +66,20 @@ export class GameScene extends Scene {
     });
     this.add(this.banner);
 
+    this.muteLabel = new Label({
+      pos: vec(24, GAME_HEIGHT - 16),
+      z: 40,
+      text: '',
+      font: new Font({
+        family: 'monospace',
+        size: 14,
+        unit: FontUnit.Px,
+        color: Color.fromHex(COLOR_TEXT_MUTED),
+        textAlign: TextAlign.Left,
+      }),
+    });
+    this.add(this.muteLabel);
+
     // Touch / mouse: tap the top zone to spin the piece, hold the lower
     // left/right halves to rotate the core.
     engine.input.pointers.primary.on('down', (evt) => {
@@ -89,6 +105,11 @@ export class GameScene extends Scene {
     this.field.reset(getLevelConfig(this.level), score);
     this.showBanner(`LEVEL ${this.level}`);
     this.syncHud();
+    music.start();
+  }
+
+  override onDeactivate(): void {
+    music.stop();
   }
 
   private showBanner(text: string): void {
@@ -117,6 +138,7 @@ export class GameScene extends Scene {
     this.field.setRotationInput(this.touchDir);
     this.field.update(engine, elapsed);
     this.hud.update(elapsed);
+    this.muteLabel.text = sfx.isMuted() ? 'M · SOUND OFF' : 'M · SOUND ON';
 
     const config = getLevelConfig(this.level);
     if (
