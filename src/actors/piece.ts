@@ -30,6 +30,8 @@ export interface FallingPiece {
   ghostKey: string;
   /** Time spent resting on the surface — locks when it exceeds the grace window. */
   lockTimer: number;
+  /** Hard drop requested: slam to the rest position and lock immediately. */
+  hardDropped: boolean;
   trailTimer: number;
 }
 
@@ -80,6 +82,7 @@ export const createFallingPiece = (
     ghostActors: [],
     ghostKey: '',
     lockTimer: 0,
+    hardDropped: false,
     trailTimer: 0,
   };
   rebuildPieceCells(piece);

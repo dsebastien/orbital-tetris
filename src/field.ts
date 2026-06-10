@@ -20,6 +20,8 @@ import {
   SCORE_PER_CLEARED_CELL,
   SCORE_PER_PIECE,
   SECTOR_ANGLE,
+  SOFT_DROP_LOCK_FACTOR,
+  SOFT_DROP_SPEED_FACTOR,
   SECTOR_COUNT,
   SPAWN_RADIUS,
   TRAIL_INTERVAL_MS,
@@ -287,16 +289,33 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
     handleClears();
   };
 
+  /** The piece closest to the core — the one player inputs act on. */
+  const activePiece = (): FallingPiece | undefined =>
+    pieces.length === 0
+      ? undefined
+      : pieces.reduce((nearest, piece) => (piece.anchorDist < nearest.anchorDist ? piece : nearest));
+
   const rotateActivePiece = (): void => {
-    if (over || paused || pieces.length === 0) {
+    if (over || paused) {
       return;
     }
-    const active = pieces.reduce((nearest, piece) =>
-      piece.anchorDist < nearest.anchorDist ? piece : nearest
-    );
+    const active = activePiece();
+    if (!active || active.hardDropped) {
+      return;
+    }
     active.cells = rotateCells(active.cells);
     rebuildPieceCells(active);
     positionPiece(active);
+  };
+
+  const hardDropActivePiece = (): void => {
+    if (over || paused) {
+      return;
+    }
+    const active = activePiece();
+    if (active) {
+      active.hardDropped = true;
+    }
   };
 
   const update = (engine: Engine, elapsedMs: number): void => {
@@ -318,6 +337,7 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
     }
 
     const dt = elapsedMs / 1000;
+    let softDrop = false;
     if (opts.demo) {
       coreAngle += ROTATION_SPEED * DEMO_ROTATION_FACTOR * dt;
       targetCoreAngle = coreAngle;
@@ -346,13 +366,14 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
         }
       }
       coreAngle += shortestAngleDelta(coreAngle, targetCoreAngle) * Math.min(1, dt * CORE_SNAP_SPEED);
-      if (
-        engine.input.keyboard.wasPressed(Keys.Up) ||
-        engine.input.keyboard.wasPressed(Keys.W) ||
-        engine.input.keyboard.wasPressed(Keys.Space)
-      ) {
+      if (engine.input.keyboard.wasPressed(Keys.Up) || engine.input.keyboard.wasPressed(Keys.W)) {
         rotateActivePiece();
       }
+      if (engine.input.keyboard.wasPressed(Keys.Space)) {
+        hardDropActivePiece();
+      }
+      softDrop =
+        engine.input.keyboard.isHeld(Keys.Down) || engine.input.keyboard.isHeld(Keys.S);
     }
     core.root.rotation = coreAngle;
 
@@ -368,8 +389,10 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
     }
 
     const lockDelay = opts.demo ? 0 : LOCK_DELAY_MS;
+    const active = activePiece();
     for (const piece of [...pieces]) {
-      piece.anchorDist -= piece.speed * dt;
+      const dropped = piece === active && softDrop;
+      piece.anchorDist -= piece.speed * dt * (dropped ? SOFT_DROP_SPEED_FACTOR : 1);
 
       // Rest on the surface instead of locking instantly: the grace window
       // lets the player step or spin at the last moment to intertwine.
@@ -377,9 +400,23 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
       const lockRing = lockRingFor(piece.cells, baseSector);
       updateGhost(piece, baseSector, lockRing);
       const restDist = CORE_RADIUS + (lockRing + 0.5) * RING_HEIGHT;
-      if (piece.anchorDist <= restDist) {
+      if (piece.hardDropped) {
+        // Slam to the rest position and lock this frame — leave a streak of
+        // trail dots along the travelled path so the slam reads visually.
+        const from = piece.anchorDist;
         piece.anchorDist = restDist;
-        piece.lockTimer += elapsedMs;
+        piece.lockTimer = lockDelay;
+        positionPiece(piece);
+        for (let dist = restDist; dist < from; dist += RING_HEIGHT / 2) {
+          for (const cell of piece.cells) {
+            const angle = piece.displayAngle + cell.s * SECTOR_ANGLE;
+            const radius = dist + cell.r * RING_HEIGHT;
+            fx.trail(vec(CENTER_X, CENTER_Y).add(Vector.fromAngle(angle).scale(radius)), piece.color);
+          }
+        }
+      } else if (piece.anchorDist <= restDist) {
+        piece.anchorDist = restDist;
+        piece.lockTimer += elapsedMs * (dropped ? SOFT_DROP_LOCK_FACTOR : 1);
       } else {
         piece.lockTimer = 0;
       }

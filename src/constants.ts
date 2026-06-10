@@ -38,6 +38,12 @@ export const PIECE_ALIGN_SPEED = 10;
  */
 export const LOCK_DELAY_MS = 400;
 
+// --- Dropping ---
+/** Fall-speed multiplier on the active piece while soft drop is held. */
+export const SOFT_DROP_SPEED_FACTOR = 5;
+/** Lock-timer multiplier on a resting active piece while soft drop is held. */
+export const SOFT_DROP_LOCK_FACTOR = 4;
+
 // --- Difficulty / levels ---
 export const MAX_LEVEL = 100;
 export const BASE_BLOCK_SPEED = 60; // px/s at level 1

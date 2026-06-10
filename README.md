@@ -14,7 +14,9 @@ past the dashed boundary, the run is over.
 | Input | Action |
 | --- | --- |
 | `←` / `→` or `A` / `D` | Step the core (and all bound cells) one lane; hold to repeat |
-| `↑` / `W` / `Space` | Spin the falling piece closest to the core |
+| `↑` / `W` | Spin the falling piece closest to the core |
+| `↓` / `S` (hold) | Soft drop — the piece closest to the core falls faster and locks sooner |
+| `Space` | Hard drop — slam the piece closest to the core onto its ghost and lock it |
 | Hold lower left / right of the screen | Step the core (mobile) |
 | Tap the top of the screen | Spin the piece (mobile) |
 
