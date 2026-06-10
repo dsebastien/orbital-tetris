@@ -19,6 +19,7 @@ import {
   PIECE_ROTATE_TOUCH_ZONE,
 } from '../constants';
 import { createField, type Field } from '../field';
+import { sfx } from '../fx/sound';
 import { getLevelConfig } from '../levels';
 import { createHud, type Hud } from '../ui/hud';
 import type { GameOverData, GameStartData } from '../types';
@@ -123,6 +124,7 @@ export class GameScene extends Scene {
       this.arcsCleared = 0;
       this.field.setConfig(getLevelConfig(this.level));
       this.showBanner(`LEVEL ${this.level}`);
+      sfx.levelUp();
     }
 
     this.syncHud();

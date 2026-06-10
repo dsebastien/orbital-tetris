@@ -1,5 +1,6 @@
 import { Color, DisplayMode, Engine } from 'excalibur';
 import { COLOR_BACKGROUND, GAME_HEIGHT, GAME_WIDTH } from './constants';
+import { sfx } from './fx/sound';
 import { GameOverScene } from './scenes/gameover';
 import { GameScene } from './scenes/game';
 import { MenuScene } from './scenes/menu';
@@ -16,5 +17,11 @@ const game = new Engine({
 game.add('menu', new MenuScene());
 game.add('game', new GameScene());
 game.add('gameover', new GameOverScene());
+
+window.addEventListener('keydown', (event) => {
+  if (event.key === 'm' || event.key === 'M') {
+    sfx.toggleMuted();
+  }
+});
 
 void game.start().then(() => game.goToScene('menu'));

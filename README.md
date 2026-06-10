@@ -19,6 +19,7 @@ past the dashed boundary, the run is over.
 | `↑` / `W` | Spin the falling piece closest to the core |
 | `↓` / `S` (hold) | Soft drop — the piece closest to the core falls faster and locks sooner |
 | `Space` | Hard drop — slam the piece closest to the core onto its ghost and lock it |
+| `M` | Toggle sound |
 | Hold lower left / right of the screen | Step the core (mobile) |
 | Tap the top of the screen | Spin the piece (mobile) |
 

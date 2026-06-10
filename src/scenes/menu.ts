@@ -79,7 +79,7 @@ export class MenuScene extends Scene {
     const controls = new Label({
       pos: vec(CENTER_X, GAME_HEIGHT - 40),
       z: 60,
-      text: '← / → step one lane — ↑ / space spin the piece — tap zones on mobile',
+      text: '← / → step — ↑ spin — ↓ soft drop — space hard drop — M mute',
       font: new Font({
         family: 'monospace',
         size: 16,
