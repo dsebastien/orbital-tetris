@@ -108,6 +108,12 @@ export const COLLAPSE_DELAY_MS = 110;
 /** Duration of the inward slide of cells outward of a cleared arc. */
 export const COLLAPSE_SLIDE_MS = 190;
 
+// --- Combos & cascades ---
+/** Consecutive clearing locks build a combo; it resets after this many locks without a clear. */
+export const COMBO_RESET_LOCKS = 2;
+/** Re-check for collapse-triggered (cascade) clears once the slide animation has settled. */
+export const CASCADE_CHECK_DELAY_MS = COLLAPSE_DELAY_MS + COLLAPSE_SLIDE_MS + 60;
+
 // --- Demo (main-menu attract mode) ---
 export const DEMO_BLOCK_SPEED = 110;
 export const DEMO_SPAWN_INTERVAL_MS = 1400;

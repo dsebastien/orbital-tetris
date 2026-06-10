@@ -1,14 +1,17 @@
 import { Actor, Circle, Color, Engine, Keys, Scene, Vector, vec } from 'excalibur';
 import {
   BIND_TWEEN_MS,
+  CASCADE_CHECK_DELAY_MS,
   CENTER_X,
   CENTER_Y,
   CLEAR_DYING_MS,
   CLEAR_RUN_LENGTH,
   COLLAPSE_DELAY_MS,
   COLLAPSE_SLIDE_MS,
+  COLOR_ACCENT,
   COLOR_DANGER,
   COLOR_WARNING,
+  COMBO_RESET_LOCKS,
   CORE_RADIUS,
   CORE_SNAP_SPEED,
   CORE_STEP_DAS_DELAY_MS,
@@ -135,6 +138,13 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
   let rotationInput: -1 | 0 | 1 = 0;
   let spawnTimer = 0;
   let aliveTimer = 0;
+  /** Consecutive clearing locks; multiplies clear scores. */
+  let combo = 0;
+  let locksSinceClear = 0;
+  /** Chain depth of collapse-triggered clears; multiplies clear scores. */
+  let cascadeLevel = 0;
+  /** Countdown to the post-collapse cascade re-check; -1 when idle. */
+  let cascadeTimer = -1;
   let pieces: FallingPiece[] = [];
   let bindTweens: BindTween[] = [];
   let dyingTweens: DyingTween[] = [];
@@ -363,10 +373,11 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
     rebuildBound();
   };
 
-  const handleClears = (): void => {
+  /** Score and animate all clearable runs. Returns true when any cleared. */
+  const handleClears = (): boolean => {
     const runs = findClearableRuns(grid, CLEAR_RUN_LENGTH);
     if (runs.length === 0) {
-      return;
+      return false;
     }
     let gained = 0;
     const cleared: { ring: number; sector: number; color: string }[] = [];
@@ -390,7 +401,7 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
       gained +=
         SCORE_PER_CLEARED_CELL * run.sectors.length * (run.fullRing ? FULL_RING_MULTIPLIER : 1);
     }
-    gained *= runs.length;
+    gained *= runs.length * (combo + 1) * (cascadeLevel + 1);
 
     if (!opts.demo) {
       const fullRing = runs.some((run) => run.fullRing);
@@ -422,6 +433,9 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
     score += gained;
     fx.popup(vec(CENTER_X, CENTER_Y - CORE_RADIUS - 40), `+${gained}`, COLOR_WARNING);
     opts.onClears?.(runs.length, score);
+    // The collapse can join arcs in inner rings — check again once it settles.
+    cascadeTimer = CASCADE_CHECK_DELAY_MS;
+    return true;
   };
 
   const lockPiece = (piece: FallingPiece, baseSector: number, lockRing: number): void => {
@@ -453,6 +467,7 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
         sfx.lock();
       }
     }
+    cascadeLevel = 0;
 
     for (const placement of placements) {
       const wedge = createBoundWedge(placement.ring, placement.sector, placement.color);
@@ -462,7 +477,18 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
       fx.burst(worldBoundPos(placement.ring, placement.sector), placement.color, 7);
     }
     score += SCORE_PER_PIECE;
-    handleClears();
+    if (handleClears()) {
+      combo += 1;
+      locksSinceClear = 0;
+      if (combo >= 2) {
+        fx.popup(vec(CENTER_X, CENTER_Y - CORE_RADIUS - 80), `COMBO ×${combo}`, COLOR_ACCENT);
+      }
+    } else {
+      locksSinceClear += 1;
+      if (locksSinceClear >= COMBO_RESET_LOCKS) {
+        combo = 0;
+      }
+    }
   };
 
   /** The piece closest to the core — the one player inputs act on. */
@@ -610,6 +636,23 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
       return;
     }
 
+    if (cascadeTimer >= 0) {
+      cascadeTimer -= elapsedMs;
+      if (cascadeTimer < 0) {
+        cascadeTimer = -1;
+        cascadeLevel += 1;
+        if (handleClears()) {
+          fx.popup(
+            vec(CENTER_X, CENTER_Y - CORE_RADIUS - 80),
+            `CASCADE ×${cascadeLevel + 1}`,
+            COLOR_ACCENT
+          );
+        } else {
+          cascadeLevel = 0;
+        }
+      }
+    }
+
     spawnTimer += elapsedMs;
     const interval = pieces.length === 0 ? Math.min(config.spawnIntervalMs, 600) : config.spawnIntervalMs;
     const canSpawn = pieces.length < config.maxConcurrent;
@@ -694,6 +737,10 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
     paused = false;
     rotationInput = 0;
     spawnTimer = 0;
+    combo = 0;
+    locksSinceClear = 0;
+    cascadeLevel = 0;
+    cascadeTimer = -1;
     coreAngle = 0;
     targetCoreAngle = 0;
     lastStepDir = 0;
