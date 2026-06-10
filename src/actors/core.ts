@@ -21,6 +21,8 @@ export interface CoreVisual {
   readonly root: Actor;
   /** Container for bound wedge actors (local polar coordinates). */
   readonly boundLayer: Actor;
+  /** Container for translucent landing previews, under the bound wedges. */
+  readonly ghostLayer: Actor;
   /** Drives the continuous "alive" effects: halo, pulse, spinner, orbiting motes. */
   update(tMs: number): void;
 }
@@ -161,6 +163,9 @@ export const createCoreVisual = (): CoreVisual => {
     motes.push(mote);
   }
 
+  const ghostLayer = new Actor({ z: 8 });
+  root.addChild(ghostLayer);
+
   const boundLayer = new Actor({ z: 9 });
   root.addChild(boundLayer);
 
@@ -180,5 +185,5 @@ export const createCoreVisual = (): CoreVisual => {
     });
   };
 
-  return { root, boundLayer, update };
+  return { root, boundLayer, ghostLayer, update };
 };

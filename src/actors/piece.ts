@@ -24,6 +24,10 @@ export interface FallingPiece {
   readonly speed: number;
   /** Container at the field center; wedge cells are its children. */
   readonly root: Actor;
+  /** Translucent preview of the exact cells the piece will lock into. */
+  ghostActors: Actor[];
+  /** Cache key of the current ghost placement — rebuild only when it changes. */
+  ghostKey: string;
   /** Time spent resting on the surface — locks when it exceeds the grace window. */
   lockTimer: number;
   trailTimer: number;
@@ -73,6 +77,8 @@ export const createFallingPiece = (
     anchorDist,
     speed,
     root: new Actor({ pos: vec(CENTER_X, CENTER_Y), z: 12 }),
+    ghostActors: [],
+    ghostKey: '',
     lockTimer: 0,
     trailTimer: 0,
   };
