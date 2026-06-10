@@ -10,14 +10,18 @@ import {
   type SceneActivationContext,
 } from 'excalibur';
 import { CENTER_X, COLOR_DANGER, COLOR_TEXT_MUTED } from '../constants';
+import { createBackground, type Background } from '../actors/background';
 import { createButton } from '../ui/button';
 import type { GameOverData, GameStartData } from '../types';
 
 export class GameOverScene extends Scene {
   private scoreLabel!: Label;
+  private background!: Background;
+  private t = 0;
   private data: GameOverData = { score: 0, level: 1 };
 
   override onInitialize(engine: Engine): void {
+    this.background = createBackground(this);
     const title = new Label({
       pos: vec(CENTER_X, 200),
       z: 60,
@@ -79,5 +83,10 @@ export class GameOverScene extends Scene {
   override onActivate(ctx: SceneActivationContext<GameOverData>): void {
     this.data = ctx.data ?? { score: 0, level: 1 };
     this.scoreLabel.text = `FINAL SCORE ${this.data.score} — REACHED LEVEL ${this.data.level}`;
+  }
+
+  override onPreUpdate(_engine: Engine, elapsed: number): void {
+    this.t += elapsed;
+    this.background.update(this.t);
   }
 }

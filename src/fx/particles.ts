@@ -16,6 +16,8 @@ interface Particle {
   readonly vel: Vector;
   life: number;
   readonly maxLife: number;
+  /** Scale growth per second — used by shockwaves. */
+  readonly grow?: number;
 }
 
 export interface ParticleSystem {
@@ -25,6 +27,8 @@ export interface ParticleSystem {
   trail(pos: Vector, colorHex: string): void;
   /** Floating score text. */
   popup(pos: Vector, text: string, colorHex: string): void;
+  /** Expanding fading ring outline — ring clears and explosions. */
+  shockwave(pos: Vector, radius: number, colorHex: string): void;
   update(elapsedMs: number): void;
   clear(): void;
 }
@@ -32,9 +36,9 @@ export interface ParticleSystem {
 export const createParticleSystem = (scene: Scene): ParticleSystem => {
   let particles: Particle[] = [];
 
-  const track = (actor: Actor, vel: Vector, maxLife: number): void => {
+  const track = (actor: Actor, vel: Vector, maxLife: number, grow?: number): void => {
     scene.add(actor);
-    particles.push({ actor, vel, life: 0, maxLife });
+    particles.push(grow === undefined ? { actor, vel, life: 0, maxLife } : { actor, vel, life: 0, maxLife, grow });
   };
 
   const burst = (pos: Vector, colorHex: string, count: number): void => {
@@ -74,6 +78,19 @@ export const createParticleSystem = (scene: Scene): ParticleSystem => {
     track(label, vec(0, -50), 900);
   };
 
+  const shockwave = (pos: Vector, radius: number, colorHex: string): void => {
+    const ring = new Actor({ pos: pos.clone(), z: 25 });
+    ring.graphics.use(
+      new Circle({
+        radius,
+        color: Color.Transparent,
+        strokeColor: Color.fromHex(colorHex),
+        lineWidth: 4,
+      })
+    );
+    track(ring, vec(0, 0), 600, 0.9);
+  };
+
   const update = (elapsedMs: number): void => {
     const dt = elapsedMs / 1000;
     particles = particles.filter((particle) => {
@@ -84,6 +101,10 @@ export const createParticleSystem = (scene: Scene): ParticleSystem => {
       }
       particle.actor.pos = particle.actor.pos.add(particle.vel.scale(dt));
       particle.actor.graphics.opacity = Math.max(0, 1 - particle.life / particle.maxLife);
+      if (particle.grow !== undefined) {
+        const scale = 1 + particle.grow * (particle.life / 1000);
+        particle.actor.scale = vec(scale, scale);
+      }
       return true;
     });
   };
@@ -95,5 +116,5 @@ export const createParticleSystem = (scene: Scene): ParticleSystem => {
     particles = [];
   };
 
-  return { burst, trail, popup, update, clear };
+  return { burst, trail, popup, shockwave, update, clear };
 };
