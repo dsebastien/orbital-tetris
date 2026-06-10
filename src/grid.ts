@@ -50,31 +50,77 @@ export const lockCells = (grid: Grid, cells: readonly LockCell[]): boolean => {
   return true;
 };
 
-/** Rings fully occupied across every sector — the "correctly assembled" condition. */
-export const findFullRings = (grid: Grid): number[] => {
-  const full: number[] = [];
+/** A contiguous occupied arc within one ring, long enough to clear. */
+export interface ClearableRun {
+  readonly ring: number;
+  readonly sectors: readonly number[];
+  /** True when the run wraps the entire ring. */
+  readonly fullRing: boolean;
+}
+
+/**
+ * Find every contiguous occupied arc of at least CLEAR_RUN_LENGTH cells —
+ * the "correctly assembled" condition. Runs wrap around the circle; a fully
+ * occupied ring counts as one full-ring run.
+ */
+export const findClearableRuns = (grid: Grid, minLength: number): ClearableRun[] => {
+  const runs: ClearableRun[] = [];
   for (let ring = 0; ring < MAX_RINGS; ring++) {
-    let isFull = true;
+    const occupied = (sector: number): boolean =>
+      cellAt(grid, ring, ((sector % SECTOR_COUNT) + SECTOR_COUNT) % SECTOR_COUNT) !== null;
+
+    let fullRing = true;
     for (let sector = 0; sector < SECTOR_COUNT; sector++) {
-      if (cellAt(grid, ring, sector) === null) {
-        isFull = false;
+      if (!occupied(sector)) {
+        fullRing = false;
         break;
       }
     }
-    if (isFull) {
-      full.push(ring);
+    if (fullRing) {
+      runs.push({
+        ring,
+        sectors: Array.from({ length: SECTOR_COUNT }, (_, sector) => sector),
+        fullRing: true,
+      });
+      continue;
+    }
+
+    // Walk each maximal run exactly once: start only right after a gap.
+    for (let start = 0; start < SECTOR_COUNT; start++) {
+      if (!occupied(start) || occupied(start - 1)) {
+        continue;
+      }
+      const sectors: number[] = [];
+      let sector = start;
+      while (occupied(sector) && sectors.length < SECTOR_COUNT) {
+        sectors.push(((sector % SECTOR_COUNT) + SECTOR_COUNT) % SECTOR_COUNT);
+        sector++;
+      }
+      if (sectors.length >= minLength) {
+        runs.push({ ring, sectors, fullRing: false });
+      }
     }
   }
-  return full;
+  return runs;
 };
 
-/** Remove the given rings and collapse outer rings inward, preserving holes. */
-export const clearRings = (grid: Grid, rings: readonly number[]): void => {
-  const toClear = new Set(rings);
-  for (let sector = 0; sector < SECTOR_COUNT; sector++) {
+/**
+ * Remove the cells of the given runs and apply per-sector gravity: every cell
+ * outward of a removed cell slides one ring inward (holes are preserved).
+ */
+export const clearRuns = (grid: Grid, runs: readonly ClearableRun[]): void => {
+  const ringsBySector = new Map<number, Set<number>>();
+  for (const run of runs) {
+    for (const sector of run.sectors) {
+      const rings = ringsBySector.get(sector) ?? new Set<number>();
+      rings.add(run.ring);
+      ringsBySector.set(sector, rings);
+    }
+  }
+  for (const [sector, rings] of ringsBySector) {
     const remaining: (GridCell | null)[] = [];
     for (let ring = 0; ring < MAX_RINGS; ring++) {
-      if (!toClear.has(ring)) {
+      if (!rings.has(ring)) {
         remaining.push(cellAt(grid, ring, sector));
       }
     }

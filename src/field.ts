@@ -3,19 +3,22 @@ import {
   BIND_TWEEN_MS,
   CENTER_X,
   CENTER_Y,
+  CLEAR_RUN_LENGTH,
+  COLOR_DANGER,
   COLOR_WARNING,
   CORE_RADIUS,
   CORE_SNAP_SPEED,
   CORE_STEP_DAS_DELAY_MS,
   CORE_STEP_REPEAT_MS,
   DEMO_ROTATION_FACTOR,
+  FULL_RING_MULTIPLIER,
   LOCK_DELAY_MS,
   MAX_RINGS,
   PIECE_ALIGN_SPEED,
   RING_HEIGHT,
   ROTATION_SPEED,
+  SCORE_PER_CLEARED_CELL,
   SCORE_PER_PIECE,
-  SCORE_PER_RING,
   SECTOR_ANGLE,
   SECTOR_COUNT,
   SPAWN_RADIUS,
@@ -34,9 +37,9 @@ import { createBoundWedge } from './actors/wedge';
 import { createParticleSystem } from './fx/particles';
 import {
   cellAt,
-  clearRings,
+  clearRuns,
   createGrid,
-  findFullRings,
+  findClearableRuns,
   lockCells,
   sectorAtAngle,
   shortestAngleDelta,
@@ -50,7 +53,8 @@ export interface FieldOptions {
   /** Demo fields auto-rotate, aim at the emptiest sectors and never end the game. */
   readonly demo: boolean;
   readonly onGameOver?: (score: number) => void;
-  readonly onRingsCleared?: (count: number, score: number) => void;
+  /** Called with the number of arcs cleared simultaneously. */
+  readonly onClears?: (count: number, score: number) => void;
 }
 
 export interface Field {
@@ -82,7 +86,7 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
     blockSpeed: 60,
     spawnIntervalMs: 2000,
     maxConcurrent: 1,
-    ringsToClear: 2,
+    clearsToAdvance: 2,
   };
   let coreAngle = 0;
   let targetCoreAngle = 0;
@@ -123,7 +127,42 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
     bindTweens = [];
   };
 
+  const clearGhost = (piece: FallingPiece): void => {
+    for (const ghost of piece.ghostActors) {
+      core.ghostLayer.removeChild(ghost);
+    }
+    piece.ghostActors = [];
+    piece.ghostKey = '';
+  };
+
+  /** Translucent preview of the exact cells the piece will lock into. */
+  const updateGhost = (piece: FallingPiece, baseSector: number, lockRing: number): void => {
+    const key = `${baseSector}|${lockRing}|${piece.cells.map((cell) => `${cell.s},${cell.r}`).join(';')}`;
+    if (key === piece.ghostKey) {
+      return;
+    }
+    for (const ghost of piece.ghostActors) {
+      core.ghostLayer.removeChild(ghost);
+    }
+    piece.ghostActors = [];
+    piece.ghostKey = key;
+    const overflow = piece.cells.some((cell) => lockRing + cell.r >= MAX_RINGS);
+    for (const cell of piece.cells) {
+      const ring = lockRing + cell.r;
+      if (ring >= MAX_RINGS) {
+        continue;
+      }
+      const sector = (baseSector + cell.s) % SECTOR_COUNT;
+      const ghost = createBoundWedge(ring, sector, overflow ? COLOR_DANGER : piece.color);
+      ghost.z = 8;
+      ghost.graphics.opacity = overflow ? 0.3 : 0.22;
+      core.ghostLayer.addChild(ghost);
+      piece.ghostActors.push(ghost);
+    }
+  };
+
   const removePiece = (piece: FallingPiece): void => {
+    clearGhost(piece);
     piece.root.kill();
     pieces = pieces.filter((other) => other !== piece);
   };
@@ -191,29 +230,32 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
   };
 
   const handleClears = (): void => {
-    const full = findFullRings(grid);
-    if (full.length === 0) {
+    const runs = findClearableRuns(grid, CLEAR_RUN_LENGTH);
+    if (runs.length === 0) {
       return;
     }
-    for (const ring of full) {
+    let gained = 0;
+    for (const run of runs) {
       fx.shockwave(
         vec(CENTER_X, CENTER_Y),
-        CORE_RADIUS + (ring + 0.5) * RING_HEIGHT,
+        CORE_RADIUS + (run.ring + 0.5) * RING_HEIGHT,
         COLOR_WARNING
       );
-      for (let sector = 0; sector < SECTOR_COUNT; sector++) {
-        const cell = cellAt(grid, ring, sector);
+      for (const sector of run.sectors) {
+        const cell = cellAt(grid, run.ring, sector);
         if (cell) {
-          fx.burst(worldBoundPos(ring, sector), cell.color, 10);
+          fx.burst(worldBoundPos(run.ring, sector), cell.color, 10);
         }
       }
+      gained +=
+        SCORE_PER_CLEARED_CELL * run.sectors.length * (run.fullRing ? FULL_RING_MULTIPLIER : 1);
     }
-    clearRings(grid, full);
+    gained *= runs.length;
+    clearRuns(grid, runs);
     rebuildBound();
-    const gained = SCORE_PER_RING * full.length * full.length;
     score += gained;
     fx.popup(vec(CENTER_X, CENTER_Y - CORE_RADIUS - 40), `+${gained}`, COLOR_WARNING);
-    opts.onRingsCleared?.(full.length, score);
+    opts.onClears?.(runs.length, score);
   };
 
   const lockPiece = (piece: FallingPiece, baseSector: number, lockRing: number): void => {
@@ -333,6 +375,7 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
       // lets the player step or spin at the last moment to intertwine.
       const baseSector = sectorAtAngle(piece.anchorAngle, targetCoreAngle);
       const lockRing = lockRingFor(piece.cells, baseSector);
+      updateGhost(piece, baseSector, lockRing);
       const restDist = CORE_RADIUS + (lockRing + 0.5) * RING_HEIGHT;
       if (piece.anchorDist <= restDist) {
         piece.anchorDist = restDist;

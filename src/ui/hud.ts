@@ -33,7 +33,7 @@ export const createHud = (scene: Scene): Hud => {
   const progress = new Label({
     pos: vec(GAME_WIDTH - 24, 56),
     z: 40,
-    text: 'RINGS 0/2',
+    text: 'ARCS 0/2',
     font: makeFont(16, TextAlign.Right, COLOR_TEXT_MUTED),
   });
   scene.add(score);
@@ -48,7 +48,7 @@ export const createHud = (scene: Scene): Hud => {
       level.text = `LEVEL ${value}`;
     },
     setProgress: (cleared: number, needed: number): void => {
-      progress.text = `RINGS ${cleared}/${needed}`;
+      progress.text = `ARCS ${cleared}/${needed}`;
     },
   };
 };

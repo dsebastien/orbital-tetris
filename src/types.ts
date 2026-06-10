@@ -28,7 +28,8 @@ export interface LevelConfig {
   readonly blockSpeed: number;
   readonly spawnIntervalMs: number;
   readonly maxConcurrent: number;
-  readonly ringsToClear: number;
+  /** Arc clears required to advance to the next level. */
+  readonly clearsToAdvance: number;
 }
 
 /** Data passed when activating the game scene. */

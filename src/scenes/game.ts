@@ -28,7 +28,7 @@ export class GameScene extends Scene {
   private hud!: Hud;
   private banner!: Label;
   private level = 1;
-  private ringsCleared = 0;
+  private arcsCleared = 0;
   private bannerTimer = 0;
   private touchDir: -1 | 0 | 1 = 0;
 
@@ -39,8 +39,8 @@ export class GameScene extends Scene {
         const data: GameOverData = { score, level: this.level };
         void engine.goToScene('gameover', { sceneActivationData: data });
       },
-      onRingsCleared: (count) => {
-        this.ringsCleared += count;
+      onClears: (count) => {
+        this.arcsCleared += count;
       },
     });
     this.hud = createHud(this);
@@ -80,7 +80,7 @@ export class GameScene extends Scene {
   override onActivate(ctx: SceneActivationContext<GameStartData>): void {
     this.level = ctx.data?.level ?? 1;
     const score = ctx.data?.score ?? 0;
-    this.ringsCleared = 0;
+    this.arcsCleared = 0;
     this.touchDir = 0;
     this.field.reset(getLevelConfig(this.level), score);
     this.showBanner(`LEVEL ${this.level}`);
@@ -97,7 +97,7 @@ export class GameScene extends Scene {
   private syncHud(): void {
     this.hud.setScore(this.field.score);
     this.hud.setLevel(this.level);
-    this.hud.setProgress(this.ringsCleared, getLevelConfig(this.level).ringsToClear);
+    this.hud.setProgress(this.arcsCleared, getLevelConfig(this.level).clearsToAdvance);
   }
 
   override onPreUpdate(engine: Engine, elapsed: number): void {
@@ -116,11 +116,11 @@ export class GameScene extends Scene {
     const config = getLevelConfig(this.level);
     if (
       this.bannerTimer <= 0 &&
-      this.ringsCleared >= config.ringsToClear &&
+      this.arcsCleared >= config.clearsToAdvance &&
       this.level < MAX_LEVEL
     ) {
       this.level += 1;
-      this.ringsCleared = 0;
+      this.arcsCleared = 0;
       this.field.setConfig(getLevelConfig(this.level));
       this.showBanner(`LEVEL ${this.level}`);
     }

@@ -7,14 +7,16 @@ export const CENTER_X = GAME_WIDTH / 2;
 export const CENTER_Y = GAME_HEIGHT / 2;
 
 // --- Polar playfield ---
-export const SECTOR_COUNT = 12;
+// Cell proportions are tuned so cells stay chunky (close to square) in the
+// play area and pieces read as classic tetrominoes curved around the circle.
+export const SECTOR_COUNT = 16;
 export const SECTOR_ANGLE = (Math.PI * 2) / SECTOR_COUNT;
-export const MAX_RINGS = 7;
-export const CORE_RADIUS = 70;
-export const RING_HEIGHT = 24;
+export const MAX_RINGS = 6;
+export const CORE_RADIUS = 80;
+export const RING_HEIGHT = 30;
 /** Bound blocks beyond this radius mean the run is lost. */
 export const FIELD_LIMIT_RADIUS = CORE_RADIUS + MAX_RINGS * RING_HEIGHT;
-export const SPAWN_RADIUS = 430;
+export const SPAWN_RADIUS = 330;
 
 // --- Rotation ---
 /** Demo-mode continuous rotation speed (rad/s); player rotation steps by lanes. */
@@ -45,10 +47,16 @@ export const BASE_SPAWN_INTERVAL_MS = 2600;
 export const SPAWN_INTERVAL_DECREMENT_MS = 19;
 export const MIN_SPAWN_INTERVAL_MS = 700;
 
-// --- Scoring ---
+// --- Clearing & scoring ---
+/** A contiguous occupied arc of at least this many cells in one ring clears. */
+export const CLEAR_RUN_LENGTH = 6;
 export const SCORE_PER_PIECE = 20;
-/** A clear of n simultaneous rings awards SCORE_PER_RING * n * n. */
-export const SCORE_PER_RING = 100;
+/**
+ * Each cleared cell is worth this much, doubled for a complete ring, and the
+ * total is multiplied by the number of arcs cleared simultaneously.
+ */
+export const SCORE_PER_CLEARED_CELL = 15;
+export const FULL_RING_MULTIPLIER = 2;
 
 // --- Effects / timing ---
 export const TRAIL_INTERVAL_MS = 90;

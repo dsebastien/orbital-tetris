@@ -18,7 +18,7 @@ const DEMO_CONFIG: LevelConfig = {
   blockSpeed: DEMO_BLOCK_SPEED,
   spawnIntervalMs: DEMO_SPAWN_INTERVAL_MS,
   maxConcurrent: DEMO_MAX_CONCURRENT,
-  ringsToClear: Number.POSITIVE_INFINITY,
+  clearsToAdvance: Number.POSITIVE_INFINITY,
 };
 
 /** Attract-mode menu: the field plays itself behind a big start button. */
@@ -47,7 +47,7 @@ export class MenuScene extends Scene {
     const subtitle = new Label({
       pos: vec(CENTER_X, 120),
       z: 60,
-      text: 'Rotate the core. Assemble full rings. Survive.',
+      text: 'Rotate the core. Assemble arcs. Survive.',
       font: new Font({
         family: 'monospace',
         size: 18,
