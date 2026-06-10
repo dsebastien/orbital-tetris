@@ -24,6 +24,8 @@ export interface CoreVisual {
   readonly boundLayer: Actor;
   /** Container for translucent landing previews, under the bound wedges. */
   readonly ghostLayer: Actor;
+  /** Stack reached the outermost ring: red boundary, frantic pulse. */
+  setDanger(danger: boolean): void;
   /** Drives the continuous "alive" effects: halo, pulse, spinner, orbiting motes. */
   update(tMs: number): void;
 }
@@ -150,10 +152,29 @@ export const createCoreVisual = (): CoreVisual => {
   const boundLayer = new Actor({ z: 9 });
   root.addChild(boundLayer);
 
+  // Solid red boundary ring, invisible until the stack endangers the run.
+  const dangerSize = FIELD_LIMIT_RADIUS * 2 + 10;
+  const dangerRing = new Actor({ z: 4 });
+  dangerRing.graphics.use(
+    crispCanvas(dangerSize, dangerSize, (ctx) => {
+      ctx.strokeStyle = 'rgba(255, 80, 80, 0.9)';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(dangerSize / 2, dangerSize / 2, FIELD_LIMIT_RADIUS, 0, Math.PI * 2);
+      ctx.stroke();
+    })
+  );
+  dangerRing.graphics.opacity = 0;
+  root.addChild(dangerRing);
+
+  let danger = false;
+
   const update = (tMs: number): void => {
-    const pulseScale = 1 + 0.12 * Math.sin(tMs * 0.0025);
+    // Heartbeat: the core pulses more than twice as fast while in danger.
+    const urgency = danger ? 2.4 : 1;
+    const pulseScale = 1 + 0.12 * Math.sin(tMs * 0.0025 * urgency);
     pulse.scale = vec(pulseScale, pulseScale);
-    pulse.graphics.opacity = 0.65 + 0.35 * Math.sin(tMs * 0.004);
+    pulse.graphics.opacity = 0.65 + 0.35 * Math.sin(tMs * 0.004 * urgency);
 
     const haloScale = 1 + 0.06 * Math.sin(tMs * 0.0021);
     halo.scale = vec(haloScale, haloScale);
@@ -164,7 +185,17 @@ export const createCoreVisual = (): CoreVisual => {
       const angle = tMs * 0.0012 + (i * Math.PI * 2) / 3;
       mote.pos = Vector.fromAngle(angle).scale(CORE_RADIUS * 0.68);
     });
+
+    dangerRing.graphics.opacity = danger ? 0.4 + 0.45 * Math.abs(Math.sin(tMs * 0.006)) : 0;
   };
 
-  return { root, boundLayer, ghostLayer, update };
+  return {
+    root,
+    boundLayer,
+    ghostLayer,
+    setDanger: (value: boolean): void => {
+      danger = value;
+    },
+    update,
+  };
 };

@@ -183,6 +183,15 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
     }
   };
 
+  /** Danger when any bound cell sits on the outermost ring. */
+  const updateDanger = (): void => {
+    let danger = false;
+    for (let sector = 0; sector < SECTOR_COUNT && !danger; sector++) {
+      danger = cellAt(grid, MAX_RINGS - 1, sector) !== null;
+    }
+    core.setDanger(danger);
+  };
+
   const rebuildBound = (): void => {
     clearChildren(core.boundLayer);
     for (let ring = 0; ring < MAX_RINGS; ring++) {
@@ -196,6 +205,7 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
     bindTweens = [];
     dyingTweens = [];
     collapseTweens = [];
+    updateDanger();
   };
 
   /**
@@ -237,6 +247,7 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
       core.boundLayer.addChild(wedge);
       dyingTweens.push({ actor: wedge, midAngle, t: 0 });
     }
+    updateDanger();
   };
 
   const clearGhost = (piece: FallingPiece): void => {
@@ -476,6 +487,7 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
       bindTweens.push({ actor: wedge, t: 0 });
       fx.burst(worldBoundPos(placement.ring, placement.sector), placement.color, 7);
     }
+    updateDanger();
     score += SCORE_PER_PIECE;
     if (handleClears()) {
       combo += 1;
