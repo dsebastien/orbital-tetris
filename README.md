@@ -23,10 +23,16 @@ past the dashed boundary, the run is over.
 - Pieces travel radially inward, rigid, and rest on first contact. A short grace
   window before they lock lets you step or spin at the last moment to intertwine
   pieces — overhangs leave holes underneath, exactly like classic Tetris.
-- A ring fully occupied across all 12 sectors clears, and everything above collapses inward.
-- Scoring: 20 points per locked piece, `100 × n²` points for `n` rings cleared at once.
-- 100 levels: piece speed, spawn rate, concurrent pieces and rings required all ramp up.
-  Speed only changes when a new level starts.
+- A translucent ghost always shows the exact cells the piece will lock into
+  (it turns red when locking there would end the run).
+- **Clearing**: any contiguous occupied arc of 6+ cells in one ring disappears —
+  the circular equivalent of a line. A complete 16-cell ring scores double, and
+  clearing several arcs at once multiplies the total. Cells outward of a cleared
+  cell slide one ring inward.
+- Scoring: 20 points per locked piece, 15 points per cleared cell (×2 for a full
+  ring, ×N for N simultaneous arcs).
+- 100 levels: piece speed, spawn rate, concurrent pieces and arcs required all
+  ramp up. Speed only changes when a new level starts.
 - Game over when a piece would lock beyond the field boundary. Then: **Continue** (retry
   the current level, keeping your score), **Try Again** (back to level 1) or **Main Menu**.
 
@@ -52,7 +58,7 @@ npm run preview  # serve the production build
 - `src/ui/` — HUD labels and auto-sizing buttons
 - `src/scenes/` — menu (self-playing attract mode), game, game over
 
-The playfield is a polar grid: 12 sectors × 7 rings around the core. Cells render as
+The playfield is a polar grid: 16 sectors × 6 rings around the core. Cells render as
 annular-sector wedges so the construction tiles the circle. The core actor rotates in
 lane steps; bound wedges are children of it in local polar coordinates, while falling
 pieces fly in world space along fixed radial paths — which is why stepping the core
