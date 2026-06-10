@@ -12,7 +12,6 @@ export const SECTOR_ANGLE = (Math.PI * 2) / SECTOR_COUNT;
 export const MAX_RINGS = 7;
 export const CORE_RADIUS = 70;
 export const RING_HEIGHT = 24;
-export const BLOCK_RADIUS = 11;
 /** Bound blocks beyond this radius mean the run is lost. */
 export const FIELD_LIMIT_RADIUS = CORE_RADIUS + MAX_RINGS * RING_HEIGHT;
 export const SPAWN_RADIUS = 430;
@@ -56,10 +55,9 @@ export const PIECE_COLOR_Z = '#ff6b6b';
 export const PIECE_COLOR_J = '#4895ef';
 export const PIECE_COLOR_L = '#ff9d5c';
 
-// --- Bound-cell wedge rendering ---
+// --- Wedge-cell rendering (bound construction and falling pieces) ---
 export const WEDGE_GAP_ANGULAR = 0.014; // rad shaved off each side of a sector
 export const WEDGE_GAP_RADIAL = 1.5; // px shaved off inner/outer edges
-export const LINK_DOT_RADIUS = 4;
 
 // --- Palette ---
 export const COLOR_BACKGROUND = '#0b0e1d';

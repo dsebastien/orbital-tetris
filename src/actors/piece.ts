@@ -1,108 +1,55 @@
-import { Actor, Canvas, Circle, Color, Vector, vec } from 'excalibur';
-import {
-  BLOCK_RADIUS,
-  CENTER_X,
-  CENTER_Y,
-  LINK_DOT_RADIUS,
-  RING_HEIGHT,
-  SECTOR_ANGLE,
-} from '../constants';
-import { shade, withAlpha } from '../fx/palette';
-import { computeEdges } from '../pieces';
+import { Actor, Vector, vec } from 'excalibur';
+import { CENTER_X, CENTER_Y } from '../constants';
+import { createPieceCellWedge, PIECE_VIRTUAL_MID } from './wedge';
 import type { PieceCell, PieceShape } from '../types';
 
-/** A tetromino in flight toward the core. */
+/**
+ * A tetromino in flight toward the core. Rendered as a rigid chunk of wedge
+ * cells (same look as the bound construction) curving with the circle, so the
+ * exact shape is visible from the moment it spawns.
+ */
 export interface FallingPiece {
   cells: PieceCell[];
-  edges: [number, number][];
   readonly color: string;
   /** World-space angle of the s=0 cell column (fixed — the core rotates, not the piece). */
   readonly anchorAngle: number;
   /** Distance of the r=0 cells from the field center. */
   anchorDist: number;
   readonly speed: number;
-  readonly cellActors: Actor[];
-  readonly linkActors: Actor[];
+  /** Sits at the piece's virtual circle center; wedge cells are its children. */
+  readonly root: Actor;
   trailTimer: number;
 }
 
-// Orb bitmaps only depend on the color: cache and share them.
-const orbCache = new Map<string, Canvas>();
-
-const orbGraphic = (colorHex: string): Canvas => {
-  const cached = orbCache.get(colorHex);
-  if (cached) {
-    return cached;
+/** (Re)build the wedge children from the current cell layout — used on spawn and spin. */
+export const rebuildPieceCells = (piece: FallingPiece): void => {
+  for (const child of [...piece.root.children]) {
+    piece.root.removeChild(child);
   }
-  const glowRadius = BLOCK_RADIUS * 2.4;
-  const size = Math.ceil(glowRadius * 2) + 2;
-  const canvas = new Canvas({
-    width: size,
-    height: size,
-    cache: true,
-    draw: (ctx) => {
-      ctx.save();
-      ctx.translate(size / 2, size / 2);
-
-      const glow = ctx.createRadialGradient(0, 0, BLOCK_RADIUS * 0.4, 0, 0, glowRadius);
-      glow.addColorStop(0, withAlpha(colorHex, 0.4));
-      glow.addColorStop(1, withAlpha(colorHex, 0));
-      ctx.fillStyle = glow;
-      ctx.beginPath();
-      ctx.arc(0, 0, glowRadius, 0, Math.PI * 2);
-      ctx.fill();
-
-      const body = ctx.createRadialGradient(
-        -BLOCK_RADIUS * 0.35,
-        -BLOCK_RADIUS * 0.35,
-        BLOCK_RADIUS * 0.15,
-        0,
-        0,
-        BLOCK_RADIUS
-      );
-      body.addColorStop(0, shade(colorHex, 0.75));
-      body.addColorStop(0.4, colorHex);
-      body.addColorStop(1, shade(colorHex, -0.35));
-      ctx.fillStyle = body;
-      ctx.beginPath();
-      ctx.arc(0, 0, BLOCK_RADIUS, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.lineWidth = 1.2;
-      ctx.strokeStyle = withAlpha('#ffffff', 0.6);
-      ctx.stroke();
-      ctx.restore();
-    },
-  });
-  orbCache.set(colorHex, canvas);
-  return canvas;
+  for (const cell of piece.cells) {
+    piece.root.addChild(createPieceCellWedge(cell, piece.color));
+  }
 };
 
-export const cellWorldPos = (anchorAngle: number, anchorDist: number, cell: PieceCell): Vector => {
-  const angle = anchorAngle + cell.s * SECTOR_ANGLE;
-  const dist = anchorDist + cell.r * RING_HEIGHT;
-  return vec(CENTER_X + Math.cos(angle) * dist, CENTER_Y + Math.sin(angle) * dist);
-};
-
-/** Sync every cell orb and link dot to the piece's current anchor. */
+/**
+ * Place the piece: the root sits PIECE_VIRTUAL_MID behind the r=0 cells along
+ * the radial path, so the wedge children (positioned on the virtual circle)
+ * appear exactly at anchorDist, curving the same way the field does.
+ */
 export const positionPiece = (piece: FallingPiece): void => {
-  piece.cells.forEach((cell, i) => {
-    const actor = piece.cellActors[i];
-    if (actor) {
-      actor.pos = cellWorldPos(piece.anchorAngle, piece.anchorDist, cell);
-    }
-  });
-  piece.edges.forEach(([a, b], i) => {
-    const link = piece.linkActors[i];
-    const cellA = piece.cells[a];
-    const cellB = piece.cells[b];
-    if (link && cellA && cellB) {
-      const posA = cellWorldPos(piece.anchorAngle, piece.anchorDist, cellA);
-      const posB = cellWorldPos(piece.anchorAngle, piece.anchorDist, cellB);
-      link.pos = posA.add(posB).scale(0.5);
-    }
-  });
+  const rootDist = piece.anchorDist - PIECE_VIRTUAL_MID;
+  piece.root.pos = vec(
+    CENTER_X + Math.cos(piece.anchorAngle) * rootDist,
+    CENTER_Y + Math.sin(piece.anchorAngle) * rootDist
+  );
+  piece.root.rotation = piece.anchorAngle;
 };
+
+/** World positions of every cell — used for trails and lock effects. */
+export const pieceCellWorldPositions = (piece: FallingPiece): Vector[] =>
+  piece.root.children
+    .filter((child): child is Actor => child instanceof Actor)
+    .map((child) => child.globalPos.clone());
 
 export const createFallingPiece = (
   shape: PieceShape,
@@ -110,33 +57,16 @@ export const createFallingPiece = (
   anchorDist: number,
   speed: number
 ): FallingPiece => {
-  const cells = shape.cells.map((cell) => ({ ...cell }));
-  const edges = computeEdges(cells);
-
-  const cellActors = cells.map(() => {
-    const orb = new Actor({ z: 12 });
-    orb.graphics.use(orbGraphic(shape.color));
-    return orb;
-  });
-
-  const linkActors = edges.map(() => {
-    const link = new Actor({ z: 11 });
-    link.graphics.use(new Circle({ radius: LINK_DOT_RADIUS, color: Color.fromHex(shape.color) }));
-    link.graphics.opacity = 0.45;
-    return link;
-  });
-
   const piece: FallingPiece = {
-    cells,
-    edges,
+    cells: shape.cells.map((cell) => ({ ...cell })),
     color: shape.color,
     anchorAngle,
     anchorDist,
     speed,
-    cellActors,
-    linkActors,
+    root: new Actor({ z: 12 }),
     trailTimer: 0,
   };
+  rebuildPieceCells(piece);
   positionPiece(piece);
   return piece;
 };

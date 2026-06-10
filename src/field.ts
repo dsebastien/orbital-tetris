@@ -20,7 +20,9 @@ import { createBackground } from './actors/background';
 import { createCoreVisual } from './actors/core';
 import {
   createFallingPiece,
+  pieceCellWorldPositions,
   positionPiece,
+  rebuildPieceCells,
   type FallingPiece,
 } from './actors/piece';
 import { createBoundWedge } from './actors/wedge';
@@ -35,7 +37,7 @@ import {
   surfaceRing,
   type LockCell,
 } from './grid';
-import { randomShape, rotateCells, computeEdges } from './pieces';
+import { randomShape, rotateCells } from './pieces';
 import type { Grid, LevelConfig, PieceCell } from './types';
 
 export interface FieldOptions {
@@ -113,9 +115,7 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
   };
 
   const removePiece = (piece: FallingPiece): void => {
-    for (const actor of [...piece.cellActors, ...piece.linkActors]) {
-      actor.kill();
-    }
+    piece.root.kill();
     pieces = pieces.filter((other) => other !== piece);
   };
 
@@ -131,15 +131,16 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
 
   /** Demo pieces aim at the base sector minimizing landing height, leading the rotation. */
   const demoSpawnAngle = (cells: readonly PieceCell[]): number => {
-    let bestBase = 0;
     let bestRing = Number.POSITIVE_INFINITY;
+    const rings: number[] = [];
     for (let base = 0; base < SECTOR_COUNT; base++) {
       const ring = lockRingFor(cells, base);
-      if (ring < bestRing) {
-        bestRing = ring;
-        bestBase = base;
-      }
+      rings.push(ring);
+      bestRing = Math.min(bestRing, ring);
     }
+    // Random pick among the tied-lowest bases, or pieces would pile on one sector.
+    const candidates = rings.flatMap((ring, base) => (ring === bestRing ? [base] : []));
+    const bestBase = candidates[Math.floor(Math.random() * candidates.length)] ?? 0;
     const landing = CORE_RADIUS + (bestRing + 0.5) * RING_HEIGHT;
     const fallTime = (SPAWN_RADIUS - landing) / config.blockSpeed;
     const drift = ROTATION_SPEED * DEMO_ROTATION_FACTOR * fallTime;
@@ -150,9 +151,7 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
     const shape = randomShape();
     const angle = opts.demo ? demoSpawnAngle(shape.cells) : Math.random() * Math.PI * 2;
     const piece = createFallingPiece(shape, angle, SPAWN_RADIUS, config.blockSpeed);
-    for (const actor of [...piece.cellActors, ...piece.linkActors]) {
-      scene.add(actor);
-    }
+    scene.add(piece.root);
     pieces.push(piece);
   };
 
@@ -234,7 +233,7 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
       piece.anchorDist < nearest.anchorDist ? piece : nearest
     );
     active.cells = rotateCells(active.cells);
-    active.edges = computeEdges(active.cells);
+    rebuildPieceCells(active);
     positionPiece(active);
   };
 
@@ -298,8 +297,8 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
       piece.trailTimer += elapsedMs;
       if (piece.trailTimer > TRAIL_INTERVAL_MS) {
         piece.trailTimer = 0;
-        for (const actor of piece.cellActors) {
-          fx.trail(actor.pos.clone(), piece.color);
+        for (const pos of pieceCellWorldPositions(piece)) {
+          fx.trail(pos, piece.color);
         }
       }
       const baseSector = sectorAtAngle(piece.anchorAngle, coreAngle);

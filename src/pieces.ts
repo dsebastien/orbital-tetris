@@ -96,18 +96,3 @@ export const rotateCells = (cells: readonly PieceCell[]): PieceCell[] => {
   const minR = Math.min(...rotated.map((cell) => cell.r));
   return rotated.map((cell) => ({ s: cell.s - minS, r: cell.r - minR }));
 };
-
-/** Index pairs of lattice-adjacent cells — used to draw the connectors. */
-export const computeEdges = (cells: readonly PieceCell[]): [number, number][] => {
-  const edges: [number, number][] = [];
-  for (let i = 0; i < cells.length; i++) {
-    for (let j = i + 1; j < cells.length; j++) {
-      const a = cells[i];
-      const b = cells[j];
-      if (a && b && Math.abs(a.s - b.s) + Math.abs(a.r - b.r) === 1) {
-        edges.push([i, j]);
-      }
-    }
-  }
-  return edges;
-};
