@@ -1,11 +1,11 @@
 import { MAX_RINGS, SECTOR_ANGLE, SECTOR_COUNT } from './constants';
 import type { Grid, GridCell } from './types';
 
-export interface BindOutcome {
-  /** Ring index the block landed on (== stack height before binding). */
+/** One cell of a piece resolved to absolute grid coordinates, ready to lock. */
+export interface LockCell {
+  readonly sector: number;
   readonly ring: number;
-  /** True when the block would land beyond the field limit: the run is lost. */
-  readonly overflow: boolean;
+  readonly color: string;
 }
 
 export const createGrid = (): Grid =>
@@ -21,23 +21,33 @@ const setCell = (grid: Grid, ring: number, sector: number, cell: GridCell | null
   }
 };
 
-/** Number of contiguous occupied rings in a sector, counted from the core outward. */
-export const stackHeight = (grid: Grid, sector: number): number => {
-  let height = 0;
-  while (height < MAX_RINGS && cellAt(grid, height, sector) !== null) {
-    height++;
+/**
+ * First free ring above the topmost occupied cell of a sector.
+ * Unlike a contiguous stack height, this respects holes left by overhangs:
+ * a falling piece always rests on TOP of whatever a sector already holds.
+ */
+export const surfaceRing = (grid: Grid, sector: number): number => {
+  let top = -1;
+  for (let ring = 0; ring < MAX_RINGS; ring++) {
+    if (cellAt(grid, ring, sector) !== null) {
+      top = ring;
+    }
   }
-  return height;
+  return top + 1;
 };
 
-/** Bind a block on top of a sector's stack. Reports overflow instead of writing past the limit. */
-export const bindBlock = (grid: Grid, sector: number, color: string): BindOutcome => {
-  const ring = stackHeight(grid, sector);
-  if (ring >= MAX_RINGS) {
-    return { ring, overflow: true };
+/**
+ * Write a whole piece into the grid. Returns false (writing nothing) when any
+ * cell would land beyond the field limit — that is the game-over condition.
+ */
+export const lockCells = (grid: Grid, cells: readonly LockCell[]): boolean => {
+  if (cells.some((cell) => cell.ring >= MAX_RINGS)) {
+    return false;
   }
-  setCell(grid, ring, sector, { color });
-  return { ring, overflow: false };
+  for (const cell of cells) {
+    setCell(grid, cell.ring, cell.sector, { color: cell.color });
+  }
+  return true;
 };
 
 /** Rings fully occupied across every sector — the "correctly assembled" condition. */
@@ -58,7 +68,7 @@ export const findFullRings = (grid: Grid): number[] => {
   return full;
 };
 
-/** Remove the given rings and collapse outer rings inward (classic line-clear gravity). */
+/** Remove the given rings and collapse outer rings inward, preserving holes. */
 export const clearRings = (grid: Grid, rings: readonly number[]): void => {
   const toClear = new Set(rings);
   for (let sector = 0; sector < SECTOR_COUNT; sector++) {
