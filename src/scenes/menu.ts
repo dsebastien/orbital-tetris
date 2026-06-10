@@ -4,12 +4,14 @@ import {
   CENTER_Y,
   COLOR_ACCENT,
   COLOR_TEXT_MUTED,
+  COLOR_WARNING,
   DEMO_BLOCK_SPEED,
   DEMO_MAX_CONCURRENT,
   DEMO_SPAWN_INTERVAL_MS,
   GAME_HEIGHT,
 } from '../constants';
 import { createField, type Field } from '../field';
+import { loadBest } from '../highscore';
 import { createButton } from '../ui/button';
 import type { GameStartData, LevelConfig } from '../types';
 
@@ -24,6 +26,7 @@ const DEMO_CONFIG: LevelConfig = {
 /** Attract-mode menu: the field plays itself behind a big start button. */
 export class MenuScene extends Scene {
   private field!: Field;
+  private bestLabel!: Label;
 
   override onInitialize(engine: Engine): void {
     this.field = createField(this, { demo: true });
@@ -58,6 +61,21 @@ export class MenuScene extends Scene {
     });
     this.add(subtitle);
 
+    this.bestLabel = new Label({
+      pos: vec(CENTER_X, 152),
+      z: 60,
+      text: '',
+      font: new Font({
+        family: 'monospace',
+        size: 18,
+        unit: FontUnit.Px,
+        color: Color.fromHex(COLOR_WARNING),
+        textAlign: TextAlign.Center,
+        bold: true,
+      }),
+    });
+    this.add(this.bestLabel);
+
     const controls = new Label({
       pos: vec(CENTER_X, GAME_HEIGHT - 40),
       z: 60,
@@ -88,6 +106,8 @@ export class MenuScene extends Scene {
 
   override onActivate(): void {
     this.field.reset(DEMO_CONFIG, 0);
+    const best = loadBest();
+    this.bestLabel.text = best ? `BEST ${best.score} — LEVEL ${best.level}` : '';
   }
 
   override onPreUpdate(engine: Engine, elapsed: number): void {
