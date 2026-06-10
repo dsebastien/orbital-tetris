@@ -33,6 +33,8 @@ export interface ParticleSystem {
   popup(pos: Vector, text: string, colorHex: string): void;
   /** Expanding fading ring outline — ring clears and explosions. */
   shockwave(pos: Vector, radius: number, colorHex: string): void;
+  /** Fast radial star streaks — level-up celebrations. */
+  starburst(pos: Vector, colorHex: string, count: number): void;
   /** Full-screen color flash fading out — full-ring clears. */
   flash(colorHex: string, opacity: number): void;
   update(elapsedMs: number): void;
@@ -61,6 +63,18 @@ export const createParticleSystem = (scene: Scene): ParticleSystem => {
       const angle = Math.random() * Math.PI * 2;
       const speed = 40 + Math.random() * 140;
       track(spark, Vector.fromAngle(angle).scale(speed), 350 + Math.random() * 350);
+    }
+  };
+
+  const starburst = (pos: Vector, colorHex: string, count: number): void => {
+    for (let i = 0; i < count; i++) {
+      const streak = new Actor({ pos: pos.clone(), z: 22 });
+      streak.graphics.use(
+        new Circle({ radius: 1.5 + Math.random() * 2, color: Color.fromHex(colorHex) })
+      );
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 250 + Math.random() * 320;
+      track(streak, Vector.fromAngle(angle).scale(speed), 450 + Math.random() * 350);
     }
   };
 
@@ -136,5 +150,5 @@ export const createParticleSystem = (scene: Scene): ParticleSystem => {
     particles = [];
   };
 
-  return { burst, trail, popup, shockwave, flash, update, clear };
+  return { burst, trail, popup, shockwave, starburst, flash, update, clear };
 };

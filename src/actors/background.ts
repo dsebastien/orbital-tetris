@@ -3,8 +3,8 @@ import { CENTER_X, CENTER_Y, GAME_HEIGHT, GAME_WIDTH } from '../constants';
 import { crispCanvas } from '../fx/canvas';
 
 export interface Background {
-  /** Drives the twinkle of the second star layer. */
-  update(tMs: number): void;
+  /** Drives the twinkle and the counter-rotation parallax of the star layers. */
+  update(tMs: number, coreAngle?: number): void;
 }
 
 /** Deterministic PRNG so the starfield is identical every run (mulberry32). */
@@ -82,8 +82,12 @@ export const createBackground = (scene: Scene): Background => {
   scene.add(vignette);
 
   return {
-    update: (tMs: number): void => {
+    update: (tMs: number, coreAngle = 0): void => {
       twinkle.graphics.opacity = 0.45 + 0.35 * Math.sin(tMs * 0.0017);
+      // Stars drift against the core's rotation — parallax depth, the far
+      // layer slower than the near one. Corners are masked by the vignette.
+      deep.rotation = -coreAngle * 0.05;
+      twinkle.rotation = -coreAngle * 0.11;
     },
   };
 };

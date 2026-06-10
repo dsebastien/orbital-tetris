@@ -90,6 +90,8 @@ export interface Field {
   setRotationInput(dir: -1 | 0 | 1): void;
   /** Spin the falling piece closest to the core by 90°. */
   rotateActivePiece(): void;
+  /** Radial starburst from the center — level-up celebration. */
+  celebrateLevelUp(): void;
   readonly score: number;
 }
 
@@ -545,7 +547,7 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
 
   const update = (engine: Engine, elapsedMs: number): void => {
     aliveTimer += elapsedMs;
-    background.update(aliveTimer);
+    background.update(aliveTimer, coreAngle);
     core.update(aliveTimer);
     fx.update(elapsedMs);
 
@@ -782,6 +784,10 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
     update,
     reset,
     rotateActivePiece,
+    celebrateLevelUp: (): void => {
+      fx.starburst(vec(CENTER_X, CENTER_Y), '#ffffff', 36);
+      fx.shockwave(vec(CENTER_X, CENTER_Y), CORE_RADIUS, COLOR_ACCENT);
+    },
     setConfig: (newConfig: LevelConfig): void => {
       config = newConfig;
     },

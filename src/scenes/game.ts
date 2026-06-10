@@ -127,6 +127,7 @@ export class GameScene extends Scene {
       this.arcsCleared = 0;
       this.field.setConfig(getLevelConfig(this.level));
       this.showBanner(`LEVEL ${this.level}`);
+      this.field.celebrateLevelUp();
       sfx.levelUp();
     }
 
