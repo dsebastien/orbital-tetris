@@ -14,7 +14,9 @@ import {
   CENTER_X,
   CENTER_Y,
   COLOR_WARNING,
+  GAME_HEIGHT,
   MAX_LEVEL,
+  PIECE_ROTATE_TOUCH_ZONE,
 } from '../constants';
 import { createField, type Field } from '../field';
 import { getLevelConfig } from '../levels';
@@ -58,9 +60,14 @@ export class GameScene extends Scene {
     });
     this.add(this.banner);
 
-    // Touch / mouse rotation: hold the left or right half of the screen.
+    // Touch / mouse: tap the top zone to spin the piece, hold the lower
+    // left/right halves to rotate the core.
     engine.input.pointers.primary.on('down', (evt) => {
       if (engine.currentScene !== this) {
+        return;
+      }
+      if (evt.worldPos.y < GAME_HEIGHT * PIECE_ROTATE_TOUCH_ZONE) {
+        this.field.rotateActivePiece();
         return;
       }
       this.touchDir = evt.worldPos.x < CENTER_X ? -1 : 1;

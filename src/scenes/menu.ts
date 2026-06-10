@@ -39,6 +39,7 @@ export class MenuScene extends Scene {
         color: Color.fromHex(COLOR_ACCENT),
         textAlign: TextAlign.Center,
         bold: true,
+        shadow: { blur: 26, color: Color.fromHex(COLOR_ACCENT) },
       }),
     });
     this.add(title);
@@ -60,7 +61,7 @@ export class MenuScene extends Scene {
     const controls = new Label({
       pos: vec(CENTER_X, GAME_HEIGHT - 40),
       z: 60,
-      text: '← / → or A / D to rotate — touch left/right half on mobile',
+      text: '← / → rotate the core — ↑ / space spin the piece — tap zones on mobile',
       font: new Font({
         family: 'monospace',
         size: 16,
