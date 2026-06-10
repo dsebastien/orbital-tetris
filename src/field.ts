@@ -3,7 +3,10 @@ import {
   BIND_TWEEN_MS,
   CENTER_X,
   CENTER_Y,
+  CLEAR_DYING_MS,
   CLEAR_RUN_LENGTH,
+  COLLAPSE_DELAY_MS,
+  COLLAPSE_SLIDE_MS,
   COLOR_DANGER,
   COLOR_WARNING,
   CORE_RADIUS,
@@ -35,7 +38,7 @@ import {
   rebuildPieceCells,
   type FallingPiece,
 } from './actors/piece';
-import { createBoundWedge } from './actors/wedge';
+import { applyWedge, createBoundWedge, wedgeMidRadius } from './actors/wedge';
 import { createParticleSystem } from './fx/particles';
 import {
   cellAt,
@@ -76,6 +79,23 @@ interface BindTween {
   t: number;
 }
 
+/** A cleared wedge flashing white, then shrinking and spinning away. */
+interface DyingTween {
+  readonly actor: Actor;
+  readonly midAngle: number;
+  t: number;
+}
+
+/** A surviving wedge sliding inward to fill the gap a clear left below it. */
+interface CollapseTween {
+  readonly actor: Actor;
+  readonly sector: number;
+  readonly fromRing: number;
+  readonly toRing: number;
+  readonly color: string;
+  t: number;
+}
+
 export const createField = (scene: Scene, opts: FieldOptions): Field => {
   const background = createBackground(scene);
   const core = createCoreVisual();
@@ -102,6 +122,8 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
   let aliveTimer = 0;
   let pieces: FallingPiece[] = [];
   let bindTweens: BindTween[] = [];
+  let dyingTweens: DyingTween[] = [];
+  let collapseTweens: CollapseTween[] = [];
 
   const worldBoundPos = (ring: number, sector: number): Vector => {
     const local = Vector.fromAngle((sector + 0.5) * SECTOR_ANGLE).scale(
@@ -127,6 +149,49 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
       }
     }
     bindTweens = [];
+    dyingTweens = [];
+    collapseTweens = [];
+  };
+
+  /**
+   * Rebuild after a clear with the collapse animated: cells that slid inward
+   * start at their old ring and tween to their new one, and the cleared cells
+   * leave white dying wedges behind. The grid itself is already final — only
+   * the visuals catch up.
+   */
+  const rebuildBoundAnimated = (
+    cleared: readonly { ring: number; sector: number; color: string }[],
+    sliders: readonly { sector: number; fromRing: number; toRing: number }[]
+  ): void => {
+    bindTweens = [];
+    dyingTweens = [];
+    collapseTweens = [];
+    const sliderFrom = new Map<string, number>();
+    for (const slider of sliders) {
+      sliderFrom.set(`${slider.toRing}|${slider.sector}`, slider.fromRing);
+    }
+    clearChildren(core.boundLayer);
+    for (let ring = 0; ring < MAX_RINGS; ring++) {
+      for (let sector = 0; sector < SECTOR_COUNT; sector++) {
+        const cell = cellAt(grid, ring, sector);
+        if (!cell) {
+          continue;
+        }
+        const fromRing = sliderFrom.get(`${ring}|${sector}`);
+        const wedge = createBoundWedge(fromRing ?? ring, sector, cell.color);
+        core.boundLayer.addChild(wedge);
+        if (fromRing !== undefined) {
+          collapseTweens.push({ actor: wedge, sector, fromRing, toRing: ring, color: cell.color, t: 0 });
+        }
+      }
+    }
+    for (const cell of cleared) {
+      const wedge = new Actor({ z: 11 });
+      const midAngle = (cell.sector + 0.5) * SECTOR_ANGLE;
+      applyWedge(wedge, cell.ring, midAngle, '#ffffff');
+      core.boundLayer.addChild(wedge);
+      dyingTweens.push({ actor: wedge, midAngle, t: 0 });
+    }
   };
 
   const clearGhost = (piece: FallingPiece): void => {
@@ -237,6 +302,8 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
       return;
     }
     let gained = 0;
+    const cleared: { ring: number; sector: number; color: string }[] = [];
+    const removedBySector = new Map<number, number[]>();
     for (const run of runs) {
       fx.shockwave(
         vec(CENTER_X, CENTER_Y),
@@ -247,14 +314,34 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
         const cell = cellAt(grid, run.ring, sector);
         if (cell) {
           fx.burst(worldBoundPos(run.ring, sector), cell.color, 10);
+          cleared.push({ ring: run.ring, sector, color: cell.color });
         }
+        const removed = removedBySector.get(sector) ?? [];
+        removed.push(run.ring);
+        removedBySector.set(sector, removed);
       }
       gained +=
         SCORE_PER_CLEARED_CELL * run.sectors.length * (run.fullRing ? FULL_RING_MULTIPLIER : 1);
     }
     gained *= runs.length;
+
+    // Cells outward of a removed cell slide inward — record where each one
+    // travels from so the rebuild can animate the collapse.
+    const sliders: { sector: number; fromRing: number; toRing: number }[] = [];
+    for (const [sector, removed] of removedBySector) {
+      for (let ring = 0; ring < MAX_RINGS; ring++) {
+        if (cellAt(grid, ring, sector) === null || removed.includes(ring)) {
+          continue;
+        }
+        const drop = removed.filter((removedRing) => removedRing < ring).length;
+        if (drop > 0) {
+          sliders.push({ sector, fromRing: ring, toRing: ring - drop });
+        }
+      }
+    }
+
     clearRuns(grid, runs);
-    rebuildBound();
+    rebuildBoundAnimated(cleared, sliders);
     score += gained;
     fx.popup(vec(CENTER_X, CENTER_Y - CORE_RADIUS - 40), `+${gained}`, COLOR_WARNING);
     opts.onClears?.(runs.length, score);
@@ -330,6 +417,49 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
       const scale = 1.5 - 0.5 * progress;
       tween.actor.scale = vec(scale, scale);
       return progress < 1;
+    });
+
+    // Cleared wedges: hold the white flash, then shrink, spin and fade away.
+    dyingTweens = dyingTweens.filter((tween) => {
+      tween.t += elapsedMs;
+      const progress = Math.min(tween.t / CLEAR_DYING_MS, 1);
+      if (progress >= 1) {
+        tween.actor.kill();
+        return false;
+      }
+      const flash = 0.25;
+      if (progress < flash) {
+        const swell = 1 + 0.12 * (progress / flash);
+        tween.actor.scale = vec(swell, swell);
+      } else {
+        const fade = (progress - flash) / (1 - flash);
+        const scale = 1.12 * (1 - fade * fade);
+        tween.actor.scale = vec(scale, scale);
+        tween.actor.rotation = tween.midAngle + fade * 1.4;
+        tween.actor.graphics.opacity = 1 - fade;
+      }
+      return true;
+    });
+
+    // Surviving wedges gliding one or more rings inward after a clear.
+    collapseTweens = collapseTweens.filter((tween) => {
+      tween.t += elapsedMs;
+      if (tween.t < COLLAPSE_DELAY_MS) {
+        return true;
+      }
+      const progress = Math.min((tween.t - COLLAPSE_DELAY_MS) / COLLAPSE_SLIDE_MS, 1);
+      const midAngle = (tween.sector + 0.5) * SECTOR_ANGLE;
+      if (progress >= 1) {
+        applyWedge(tween.actor, tween.toRing, midAngle, tween.color);
+        return false;
+      }
+      // Ease out; swap to the destination ring's bitmap halfway through.
+      const eased = 1 - (1 - progress) * (1 - progress);
+      applyWedge(tween.actor, progress < 0.5 ? tween.fromRing : tween.toRing, midAngle, tween.color);
+      const from = wedgeMidRadius(tween.fromRing);
+      const to = wedgeMidRadius(tween.toRing);
+      tween.actor.pos = Vector.fromAngle(midAngle).scale(from + (to - from) * eased);
+      return true;
     });
 
     if (over) {

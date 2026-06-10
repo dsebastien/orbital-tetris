@@ -68,6 +68,12 @@ export const FULL_RING_MULTIPLIER = 2;
 export const TRAIL_INTERVAL_MS = 90;
 export const BIND_TWEEN_MS = 220;
 export const BANNER_DURATION_MS = 1500;
+/** Cleared wedges flash white then shrink/spin away over this long. */
+export const CLEAR_DYING_MS = 320;
+/** Beat between a clear and the outward cells starting to slide inward. */
+export const COLLAPSE_DELAY_MS = 110;
+/** Duration of the inward slide of cells outward of a cleared arc. */
+export const COLLAPSE_SLIDE_MS = 190;
 
 // --- Demo (main-menu attract mode) ---
 export const DEMO_BLOCK_SPEED = 110;

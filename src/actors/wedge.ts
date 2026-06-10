@@ -93,6 +93,12 @@ export const applyWedge = (
   actor.graphics.use(wedgeGraphic(ring, colorHex));
 };
 
+/** Mid-radius applyWedge places a wedge at — for tweening between rings. */
+export const wedgeMidRadius = (ring: number): number => {
+  const geo = geometryFor(ring);
+  return (geo.xMin + geo.xMax) / 2;
+};
+
 /** Ring index whose wedge mid-radius is closest to the given distance. */
 export const ringIndexForDistance = (dist: number): number =>
   Math.max(0, Math.round((dist - CORE_RADIUS) / RING_HEIGHT - 0.5));
