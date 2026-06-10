@@ -5,7 +5,11 @@ import {
   CENTER_Y,
   COLOR_WARNING,
   CORE_RADIUS,
+  CORE_SNAP_SPEED,
+  CORE_STEP_DAS_DELAY_MS,
+  CORE_STEP_REPEAT_MS,
   DEMO_ROTATION_FACTOR,
+  LOCK_DELAY_MS,
   MAX_RINGS,
   PIECE_ALIGN_SPEED,
   RING_HEIGHT,
@@ -81,6 +85,9 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
     ringsToClear: 2,
   };
   let coreAngle = 0;
+  let targetCoreAngle = 0;
+  let lastStepDir: -1 | 0 | 1 = 0;
+  let stepHoldTimer = 0;
   let score = 0;
   let paused = false;
   let over = false;
@@ -149,9 +156,14 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
     return coreAngle + drift + (bestBase + 0.5) * SECTOR_ANGLE;
   };
 
-  /** World angle of the center of the lane the piece currently locks into. */
+  /**
+   * World angle of the center of the lane the piece currently locks into.
+   * The lane is decided by the stepped target angle (instant on input) while
+   * the drawn angle follows the animated core, so piece and construction
+   * glide together during a step.
+   */
   const laneAngleFor = (piece: FallingPiece): number =>
-    coreAngle + (sectorAtAngle(piece.anchorAngle, coreAngle) + 0.5) * SECTOR_ANGLE;
+    coreAngle + (sectorAtAngle(piece.anchorAngle, targetCoreAngle) + 0.5) * SECTOR_ANGLE;
 
   const spawnPiece = (): void => {
     const shape = randomShape();
@@ -264,10 +276,11 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
     }
 
     const dt = elapsedMs / 1000;
-    let dir: -1 | 0 | 1 = rotationInput;
     if (opts.demo) {
-      dir = 1;
+      coreAngle += ROTATION_SPEED * DEMO_ROTATION_FACTOR * dt;
+      targetCoreAngle = coreAngle;
     } else {
+      let dir: -1 | 0 | 1 = rotationInput;
       if (engine.input.keyboard.isHeld(Keys.Left) || engine.input.keyboard.isHeld(Keys.A)) {
         dir = -1;
       } else if (
@@ -276,6 +289,21 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
       ) {
         dir = 1;
       }
+      // Lane-stepped rotation: one sector per press, auto-repeat while held.
+      if (dir !== lastStepDir) {
+        lastStepDir = dir;
+        stepHoldTimer = 0;
+        if (dir !== 0) {
+          targetCoreAngle += dir * SECTOR_ANGLE;
+        }
+      } else if (dir !== 0) {
+        stepHoldTimer += elapsedMs;
+        if (stepHoldTimer >= CORE_STEP_DAS_DELAY_MS) {
+          targetCoreAngle += dir * SECTOR_ANGLE;
+          stepHoldTimer -= CORE_STEP_REPEAT_MS;
+        }
+      }
+      coreAngle += shortestAngleDelta(coreAngle, targetCoreAngle) * Math.min(1, dt * CORE_SNAP_SPEED);
       if (
         engine.input.keyboard.wasPressed(Keys.Up) ||
         engine.input.keyboard.wasPressed(Keys.W) ||
@@ -284,8 +312,6 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
         rotateActivePiece();
       }
     }
-    const speed = opts.demo ? ROTATION_SPEED * DEMO_ROTATION_FACTOR : ROTATION_SPEED;
-    coreAngle += dir * speed * dt;
     core.root.rotation = coreAngle;
 
     if (paused) {
@@ -299,12 +325,27 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
       spawnPiece();
     }
 
+    const lockDelay = opts.demo ? 0 : LOCK_DELAY_MS;
     for (const piece of [...pieces]) {
       piece.anchorDist -= piece.speed * dt;
+
+      // Rest on the surface instead of locking instantly: the grace window
+      // lets the player step or spin at the last moment to intertwine.
+      const baseSector = sectorAtAngle(piece.anchorAngle, targetCoreAngle);
+      const lockRing = lockRingFor(piece.cells, baseSector);
+      const restDist = CORE_RADIUS + (lockRing + 0.5) * RING_HEIGHT;
+      if (piece.anchorDist <= restDist) {
+        piece.anchorDist = restDist;
+        piece.lockTimer += elapsedMs;
+      } else {
+        piece.lockTimer = 0;
+      }
+
       // Track the landing lane so the drawn angle always matches the lock.
       const lane = laneAngleFor(piece);
       piece.displayAngle += shortestAngleDelta(piece.displayAngle, lane) * Math.min(1, dt * PIECE_ALIGN_SPEED);
       positionPiece(piece);
+
       piece.trailTimer += elapsedMs;
       if (piece.trailTimer > TRAIL_INTERVAL_MS) {
         piece.trailTimer = 0;
@@ -312,10 +353,8 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
           fx.trail(pos, piece.color);
         }
       }
-      const baseSector = sectorAtAngle(piece.anchorAngle, coreAngle);
-      const lockRing = lockRingFor(piece.cells, baseSector);
-      const restDist = CORE_RADIUS + (lockRing + 0.5) * RING_HEIGHT;
-      if (piece.anchorDist <= restDist) {
+
+      if (piece.lockTimer >= lockDelay && piece.anchorDist <= restDist) {
         lockPiece(piece, baseSector, lockRing);
       }
     }
@@ -329,6 +368,9 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
     rotationInput = 0;
     spawnTimer = 0;
     coreAngle = 0;
+    targetCoreAngle = 0;
+    lastStepDir = 0;
+    stepHoldTimer = 0;
     core.root.rotation = 0;
     for (const piece of [...pieces]) {
       removePiece(piece);

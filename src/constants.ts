@@ -17,12 +17,24 @@ export const FIELD_LIMIT_RADIUS = CORE_RADIUS + MAX_RINGS * RING_HEIGHT;
 export const SPAWN_RADIUS = 430;
 
 // --- Rotation ---
-export const ROTATION_SPEED = 2.6; // rad/s while an arrow is held
+/** Demo-mode continuous rotation speed (rad/s); player rotation steps by lanes. */
+export const ROTATION_SPEED = 2.6;
 export const DEMO_ROTATION_FACTOR = 0.15;
+/** How fast the core animates toward its stepped target angle (1/s). */
+export const CORE_SNAP_SPEED = 14;
+/** Hold delay before a held direction starts auto-repeating lane steps. */
+export const CORE_STEP_DAS_DELAY_MS = 220;
+/** Auto-repeat interval for lane steps while a direction stays held. */
+export const CORE_STEP_REPEAT_MS = 140;
 /** Taps in the top fraction of the screen spin the piece instead of the core. */
 export const PIECE_ROTATE_TOUCH_ZONE = 0.3;
 /** How fast a falling piece's displayed angle tracks its landing lane (1/s). */
 export const PIECE_ALIGN_SPEED = 10;
+/**
+ * Grace window after a piece touches the surface before it locks — lets the
+ * player step or spin at the last moment to intertwine pieces.
+ */
+export const LOCK_DELAY_MS = 400;
 
 // --- Difficulty / levels ---
 export const MAX_LEVEL = 100;
