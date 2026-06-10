@@ -13,6 +13,11 @@ export interface FallingPiece {
   readonly color: string;
   /** World-space angle of the s=0 cell column (fixed — the core rotates, not the piece). */
   readonly anchorAngle: number;
+  /**
+   * Angle the piece is drawn at: tracks the center of its current landing
+   * lane so the visual always matches where the piece will lock.
+   */
+  displayAngle: number;
   /** Distance of the r=0 cells from the field center. */
   anchorDist: number;
   readonly speed: number;
@@ -39,10 +44,10 @@ export const rebuildPieceCells = (piece: FallingPiece): void => {
 export const positionPiece = (piece: FallingPiece): void => {
   const rootDist = piece.anchorDist - PIECE_VIRTUAL_MID;
   piece.root.pos = vec(
-    CENTER_X + Math.cos(piece.anchorAngle) * rootDist,
-    CENTER_Y + Math.sin(piece.anchorAngle) * rootDist
+    CENTER_X + Math.cos(piece.displayAngle) * rootDist,
+    CENTER_Y + Math.sin(piece.displayAngle) * rootDist
   );
-  piece.root.rotation = piece.anchorAngle;
+  piece.root.rotation = piece.displayAngle;
 };
 
 /** World positions of every cell — used for trails and lock effects. */
@@ -61,6 +66,7 @@ export const createFallingPiece = (
     cells: shape.cells.map((cell) => ({ ...cell })),
     color: shape.color,
     anchorAngle,
+    displayAngle: anchorAngle,
     anchorDist,
     speed,
     root: new Actor({ z: 12 }),

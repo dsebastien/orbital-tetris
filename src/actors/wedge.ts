@@ -12,7 +12,7 @@ import type { PieceCell } from '../types';
 const PAD = 4;
 
 /** Ring used to shape the wedges of a piece in flight (mid-field curvature). */
-export const PIECE_VIRTUAL_RING = 1;
+export const PIECE_VIRTUAL_RING = 2;
 /** Distance from a piece's virtual circle center to its r=0 cell centers. */
 export const PIECE_VIRTUAL_MID = CORE_RADIUS + (PIECE_VIRTUAL_RING + 0.5) * RING_HEIGHT;
 

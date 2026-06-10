@@ -21,6 +21,8 @@ export const ROTATION_SPEED = 2.6; // rad/s while an arrow is held
 export const DEMO_ROTATION_FACTOR = 0.15;
 /** Taps in the top fraction of the screen spin the piece instead of the core. */
 export const PIECE_ROTATE_TOUCH_ZONE = 0.3;
+/** How fast a falling piece's displayed angle tracks its landing lane (1/s). */
+export const PIECE_ALIGN_SPEED = 10;
 
 // --- Difficulty / levels ---
 export const MAX_LEVEL = 100;

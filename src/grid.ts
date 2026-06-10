@@ -89,6 +89,12 @@ export const normalizeAngle = (angle: number): number => {
   return ((angle % tau) + tau) % tau;
 };
 
+/** Signed shortest rotation from one angle to another, in (-PI, PI]. */
+export const shortestAngleDelta = (from: number, to: number): number => {
+  const tau = Math.PI * 2;
+  return ((to - from + Math.PI) % tau + tau) % tau - Math.PI;
+};
+
 /** Sector a world-space angle falls into, given the current core rotation. */
 export const sectorAtAngle = (worldAngle: number, coreAngle: number): number =>
   Math.floor(normalizeAngle(worldAngle - coreAngle) / SECTOR_ANGLE) % SECTOR_COUNT;

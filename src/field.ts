@@ -7,6 +7,7 @@ import {
   CORE_RADIUS,
   DEMO_ROTATION_FACTOR,
   MAX_RINGS,
+  PIECE_ALIGN_SPEED,
   RING_HEIGHT,
   ROTATION_SPEED,
   SCORE_PER_PIECE,
@@ -34,6 +35,7 @@ import {
   findFullRings,
   lockCells,
   sectorAtAngle,
+  shortestAngleDelta,
   surfaceRing,
   type LockCell,
 } from './grid';
@@ -147,10 +149,16 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
     return coreAngle + drift + (bestBase + 0.5) * SECTOR_ANGLE;
   };
 
+  /** World angle of the center of the lane the piece currently locks into. */
+  const laneAngleFor = (piece: FallingPiece): number =>
+    coreAngle + (sectorAtAngle(piece.anchorAngle, coreAngle) + 0.5) * SECTOR_ANGLE;
+
   const spawnPiece = (): void => {
     const shape = randomShape();
     const angle = opts.demo ? demoSpawnAngle(shape.cells) : Math.random() * Math.PI * 2;
     const piece = createFallingPiece(shape, angle, SPAWN_RADIUS, config.blockSpeed);
+    piece.displayAngle = laneAngleFor(piece);
+    positionPiece(piece);
     scene.add(piece.root);
     pieces.push(piece);
   };
@@ -293,6 +301,9 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
 
     for (const piece of [...pieces]) {
       piece.anchorDist -= piece.speed * dt;
+      // Track the landing lane so the drawn angle always matches the lock.
+      const lane = laneAngleFor(piece);
+      piece.displayAngle += shortestAngleDelta(piece.displayAngle, lane) * Math.min(1, dt * PIECE_ALIGN_SPEED);
       positionPiece(piece);
       piece.trailTimer += elapsedMs;
       if (piece.trailTimer > TRAIL_INTERVAL_MS) {
