@@ -13,15 +13,16 @@ past the dashed boundary, the run is over.
 
 | Input | Action |
 | --- | --- |
-| `←` / `→` or `A` / `D` | Rotate the core and all bound cells |
+| `←` / `→` or `A` / `D` | Step the core (and all bound cells) one lane; hold to repeat |
 | `↑` / `W` / `Space` | Spin the falling piece closest to the core |
-| Hold lower left / right of the screen | Rotate the core (mobile) |
+| Hold lower left / right of the screen | Step the core (mobile) |
 | Tap the top of the screen | Spin the piece (mobile) |
 
 ## Rules
 
-- Pieces travel radially inward, rigid, and lock on first contact — overhangs leave
-  holes underneath, exactly like classic Tetris.
+- Pieces travel radially inward, rigid, and rest on first contact. A short grace
+  window before they lock lets you step or spin at the last moment to intertwine
+  pieces — overhangs leave holes underneath, exactly like classic Tetris.
 - A ring fully occupied across all 12 sectors clears, and everything above collapses inward.
 - Scoring: 20 points per locked piece, `100 × n²` points for `n` rings cleared at once.
 - 100 levels: piece speed, spawn rate, concurrent pieces and rings required all ramp up.
@@ -52,8 +53,10 @@ npm run preview  # serve the production build
 - `src/scenes/` — menu (self-playing attract mode), game, game over
 
 The playfield is a polar grid: 12 sectors × 7 rings around the core. Cells render as
-annular-sector wedges so the construction tiles the circle. The core actor rotates;
-bound wedges are children of it in local polar coordinates, while falling pieces fly
-in world space along fixed radial paths — which is why rotating the core changes where
-they land. A falling piece is drawn around its own virtual circle center with the same
-wedge cells, so its exact tetromino shape is readable from the moment it spawns.
+annular-sector wedges so the construction tiles the circle. The core actor rotates in
+lane steps; bound wedges are children of it in local polar coordinates, while falling
+pieces fly in world space along fixed radial paths — which is why stepping the core
+changes where they land. Falling cells are drawn in the true field polar frame: each
+cell sits exactly in the lane and at the radius it currently occupies, with its wedge
+sized for that radius — pieces arrive as ring chunks that shrink as they converge and
+attach with no visual snap.
