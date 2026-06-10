@@ -83,6 +83,10 @@ export const SCORE_PER_PIECE = 20;
 export const SCORE_PER_CLEARED_CELL = 15;
 export const FULL_RING_MULTIPLIER = 2;
 
+// --- Spawning ---
+/** The rim marker telegraphs an incoming piece this long before it spawns. */
+export const SPAWN_TELEGRAPH_MS = 900;
+
 // --- Effects / timing ---
 export const TRAIL_INTERVAL_MS = 90;
 export const BIND_TWEEN_MS = 220;

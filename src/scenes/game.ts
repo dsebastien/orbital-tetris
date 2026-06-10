@@ -43,6 +43,9 @@ export class GameScene extends Scene {
       onClears: (count) => {
         this.arcsCleared += count;
       },
+      onNextShape: (shape) => {
+        this.hud.setNext(shape);
+      },
     });
     this.hud = createHud(this);
 

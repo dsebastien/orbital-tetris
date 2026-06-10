@@ -89,6 +89,21 @@ export const TETROMINOES: readonly PieceShape[] = [
 export const randomShape = (): PieceShape =>
   TETROMINOES[Math.floor(Math.random() * TETROMINOES.length)] ?? TETROMINOES[0]!;
 
+/** 7-bag randomizer: every tetromino appears once per bag — no droughts. */
+export const createBag = (): (() => PieceShape) => {
+  let bag: PieceShape[] = [];
+  return () => {
+    if (bag.length === 0) {
+      bag = [...TETROMINOES];
+      for (let i = bag.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [bag[i], bag[j]] = [bag[j]!, bag[i]!];
+      }
+    }
+    return bag.pop() ?? TETROMINOES[0]!;
+  };
+};
+
 /** Rotate a shape 90° on the lattice and normalize offsets back to >= 0. */
 export const rotateCells = (cells: readonly PieceCell[]): PieceCell[] => {
   const rotated = cells.map((cell) => ({ s: cell.r, r: -cell.s }));

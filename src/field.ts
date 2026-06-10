@@ -1,4 +1,4 @@
-import { Actor, Engine, Keys, Scene, Vector, vec } from 'excalibur';
+import { Actor, Circle, Color, Engine, Keys, Scene, Vector, vec } from 'excalibur';
 import {
   BIND_TWEEN_MS,
   CENTER_X,
@@ -37,6 +37,7 @@ import {
   SOFT_DROP_LOCK_FACTOR,
   SOFT_DROP_SPEED_FACTOR,
   SPAWN_RADIUS,
+  SPAWN_TELEGRAPH_MS,
   SWEEP_EPSILON,
   TRAIL_INTERVAL_MS,
 } from './constants';
@@ -63,8 +64,8 @@ import {
   surfaceRing,
   type LockCell,
 } from './grid';
-import { randomShape, rotateCells } from './pieces';
-import type { Grid, LevelConfig, PieceCell } from './types';
+import { createBag, randomShape, rotateCells } from './pieces';
+import type { Grid, LevelConfig, PieceCell, PieceShape } from './types';
 
 export interface FieldOptions {
   /** Demo fields auto-rotate, aim at the emptiest sectors and never end the game. */
@@ -72,6 +73,8 @@ export interface FieldOptions {
   readonly onGameOver?: (score: number) => void;
   /** Called with the number of arcs cleared simultaneously. */
   readonly onClears?: (count: number, score: number) => void;
+  /** Called whenever the upcoming piece changes (never in demo mode). */
+  readonly onNextShape?: (shape: PieceShape) => void;
 }
 
 export interface Field {
@@ -136,6 +139,26 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
   let bindTweens: BindTween[] = [];
   let dyingTweens: DyingTween[] = [];
   let collapseTweens: CollapseTween[] = [];
+  const drawFromBag = createBag();
+  let nextShape: PieceShape = drawFromBag();
+  /** Entry angle telegraphed by the rim marker before the next spawn. */
+  let pendingAngle: number | null = null;
+  let marker: Actor | null = null;
+
+  const killMarker = (): void => {
+    marker?.kill();
+    marker = null;
+  };
+
+  const showMarker = (angle: number, colorHex: string): void => {
+    killMarker();
+    marker = new Actor({
+      pos: vec(CENTER_X, CENTER_Y).add(Vector.fromAngle(angle).scale(SPAWN_RADIUS)),
+      z: 14,
+    });
+    marker.graphics.use(new Circle({ radius: 7, color: Color.fromHex(colorHex) }));
+    scene.add(marker);
+  };
 
   const worldBoundPos = (ring: number, sector: number): Vector => {
     const local = Vector.fromAngle((sector + 0.5) * SECTOR_ANGLE).scale(
@@ -308,13 +331,21 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
     coreAngle + (sectorAtAngle(piece.anchorAngle, targetCoreAngle) + 0.5) * SECTOR_ANGLE;
 
   const spawnPiece = (): void => {
-    const shape = randomShape();
-    const angle = opts.demo ? demoSpawnAngle(shape.cells) : Math.random() * Math.PI * 2;
+    const shape = opts.demo ? randomShape() : nextShape;
+    const angle = opts.demo
+      ? demoSpawnAngle(shape.cells)
+      : pendingAngle ?? Math.random() * Math.PI * 2;
     const piece = createFallingPiece(shape, angle, SPAWN_RADIUS, config.blockSpeed);
     piece.displayAngle = laneAngleFor(piece);
     positionPiece(piece);
     scene.add(piece.root);
     pieces.push(piece);
+    if (!opts.demo) {
+      pendingAngle = null;
+      killMarker();
+      nextShape = drawFromBag();
+      opts.onNextShape?.(nextShape);
+    }
   };
 
   /** Demo-only: blow up the whole construction instead of ending the game. */
@@ -581,7 +612,20 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
 
     spawnTimer += elapsedMs;
     const interval = pieces.length === 0 ? Math.min(config.spawnIntervalMs, 600) : config.spawnIntervalMs;
-    if (spawnTimer >= interval && pieces.length < config.maxConcurrent) {
+    const canSpawn = pieces.length < config.maxConcurrent;
+    if (
+      !opts.demo &&
+      canSpawn &&
+      pendingAngle === null &&
+      spawnTimer >= interval - SPAWN_TELEGRAPH_MS
+    ) {
+      pendingAngle = Math.random() * Math.PI * 2;
+      showMarker(pendingAngle, nextShape.color);
+    }
+    if (marker) {
+      marker.graphics.opacity = 0.45 + 0.55 * Math.abs(Math.sin(aliveTimer * 0.008));
+    }
+    if (spawnTimer >= interval && canSpawn) {
       spawnTimer = 0;
       spawnPiece();
     }
@@ -658,9 +702,14 @@ export const createField = (scene: Scene, opts: FieldOptions): Field => {
     for (const piece of [...pieces]) {
       removePiece(piece);
     }
+    pendingAngle = null;
+    killMarker();
     grid = createGrid();
     rebuildBound();
     fx.clear();
+    if (!opts.demo) {
+      opts.onNextShape?.(nextShape);
+    }
   };
 
   return {

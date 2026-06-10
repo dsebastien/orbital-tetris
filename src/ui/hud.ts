@@ -1,11 +1,19 @@
-import { Color, Font, FontUnit, Label, Scene, TextAlign, vec } from 'excalibur';
+import { Actor, Color, Font, FontUnit, Label, Scene, TextAlign, vec } from 'excalibur';
 import { COLOR_TEXT_MUTED, GAME_WIDTH } from '../constants';
+import { crispCanvas } from '../fx/canvas';
+import { withAlpha } from '../fx/palette';
+import type { PieceShape } from '../types';
 
 export interface Hud {
   setScore(score: number): void;
   setLevel(level: number): void;
   setProgress(cleared: number, needed: number): void;
+  /** Mini lattice preview of the upcoming piece. */
+  setNext(shape: PieceShape): void;
 }
+
+/** Square size of one preview cell in px. */
+const PREVIEW_CELL = 14;
 
 const makeFont = (size: number, align: TextAlign, colorHex: string): Font =>
   new Font({
@@ -36,9 +44,19 @@ export const createHud = (scene: Scene): Hud => {
     text: 'ARCS 0/2',
     font: makeFont(16, TextAlign.Right, COLOR_TEXT_MUTED),
   });
+  const nextTitle = new Label({
+    pos: vec(24, 64),
+    z: 40,
+    text: 'NEXT',
+    font: makeFont(14, TextAlign.Left, COLOR_TEXT_MUTED),
+  });
+  const preview = new Actor({ pos: vec(24, 84), z: 40, anchor: vec(0, 0) });
+
   scene.add(score);
   scene.add(level);
   scene.add(progress);
+  scene.add(nextTitle);
+  scene.add(preview);
 
   return {
     setScore: (value: number): void => {
@@ -49,6 +67,26 @@ export const createHud = (scene: Scene): Hud => {
     },
     setProgress: (cleared: number, needed: number): void => {
       progress.text = `ARCS ${cleared}/${needed}`;
+    },
+    setNext: (shape: PieceShape): void => {
+      const maxS = Math.max(...shape.cells.map((cell) => cell.s));
+      const maxR = Math.max(...shape.cells.map((cell) => cell.r));
+      const width = (maxS + 1) * PREVIEW_CELL;
+      const height = (maxR + 1) * PREVIEW_CELL;
+      preview.graphics.use(
+        crispCanvas(width, height, (ctx) => {
+          for (const cell of shape.cells) {
+            const x = cell.s * PREVIEW_CELL;
+            // Radial offsets point outward; draw r = 0 at the bottom.
+            const y = (maxR - cell.r) * PREVIEW_CELL;
+            ctx.fillStyle = shape.color;
+            ctx.fillRect(x + 1, y + 1, PREVIEW_CELL - 2, PREVIEW_CELL - 2);
+            ctx.strokeStyle = withAlpha('#ffffff', 0.35);
+            ctx.lineWidth = 1;
+            ctx.strokeRect(x + 1.5, y + 1.5, PREVIEW_CELL - 3, PREVIEW_CELL - 3);
+          }
+        })
+      );
     },
   };
 };
